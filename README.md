@@ -57,13 +57,18 @@ var Temples = require("Temples");
 To re-use being able to use it, `temples` will try to match the key in the data to an `id` in the
 tag, since both should be unique.
 
+```html
+<div id="logged-user">
+    <span data-bind="firstname">John<span> <span data-bind="lastname">DOE<span> was here.
+</div>
+```
+
 ```js
 var Temples = require('Temples');
 
-Temples.register("hello", '<div id="test">Old Value</div>');
-var data = { "test": "New Value" };
+Temples.register("logged-user", "#logged-user");
+Temples.render("logged-user", { "firstname": "James", "lastname": "Wood" });
 
-var output = temples.bind(html, data);
 ```
 
 ## Explicit constructions
