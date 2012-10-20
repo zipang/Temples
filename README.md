@@ -1,4 +1,4 @@
-![temples](https://github.com/zipang/temples/raw/master/temples.png)
+![temples](https://raw.github.com/zipang/Temples/master/images/temples.png)
 
 # Synopsis
 Temples (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
