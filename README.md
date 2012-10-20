@@ -22,7 +22,7 @@ I want to :
 
 # Status
 
-[![Build Status](https://secure.travis-ci.org/flatiron/temples.png)](http://travis-ci.org/flatiron/temples)
+[![Build Status](https://secure.travis-ci.org/zipang/temples.png)](http://travis-ci.org/zipang/temples)
 
 # Features
 
