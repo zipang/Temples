@@ -96,6 +96,12 @@
 			return update;
 		}
 	}
+	function RenderCondition($elt, expr) {
+
+		return function(data) {
+			$elt.toggle(extractData(data, expr));
+		}
+	}
 
 	/**
 	 * A Renderer is the live instance of a static template
@@ -124,16 +130,24 @@
 			};
 
 		// let's find the first-level binded elements
-		$root.add("*[data-bind]", $root)
+		$root.add("*[data-bind], *[data-render-if]", $root)
 			.filter(notContainedInIterator)
 			.each(function (i, elt) {
 
 				var $elt = $(elt),
-					bindList = ($elt.attr("data-bind") || "").split(/\s*,\s*/); // separator is a comma ',' eventually preceded of followed by spaces
+					renderCondition = $elt.attr("data-render-if"),
+					bindExpression  = $elt.attr("data-bind");
 
-				for (var i = 0, expr; expr = bindList[i++];) {
-					console.log("Binding element " + $elt[0] + " with " + expr);
-					bindings.push(new Binding($elt, expr));
+				if (renderCondition && !bindExpression) {
+					// this element has only a data-render-if attribute
+					bindings.push(new RenderCondition($elt, renderCondition));
+				} else {
+					// each bind expression is separated by a comma ',' eventually preceded of followed by spaces
+					var boundList = (bindExpression || "").split(/\s*,\s*/);
+					for (var i = 0, expr; expr = boundList[i++];) {
+						console.log("Binding element " + $elt[0] + " with " + expr);
+						bindings.push(new Binding($elt, expr));
+					}
 				}
 			});
 
