@@ -10,7 +10,7 @@
 	if (!$) throw "Temples relies on a jQuery compatible DOM search engine and DOM manipulator";
 
     var templates = {}, // live templates indexed by name
-        targets = {};   // data bound to live update
+        targets = {};   // targets elements indexed by their path
 
     // Utilities
     /**
@@ -18,13 +18,14 @@
      * @param data
      * @param path, ex : "article.author.name"
      */
-    function extractData(data, path) {
-        var key, found = data,
+    function extractData(data, path, $elt) {
+        var key, parent, found = data,
             steps = (path || "").trim().split(".");
         while (found && (key = steps.shift())) {
+			parent = found;
             found = found[key];
         }
-        return found || "";
+        return (typeof found == "function") ? found.call(parent, $elt) : found || "";
     }
 
     // Helper Classes
@@ -50,19 +51,19 @@
 			var path = exprParts[0],
 				tagName = $elt[0].tagName.toLowerCase(); // normalize the name of the tag ('div', 'input', 'select', etc..)
 			if ("input|select".indexOf(tagName) != -1) {
-				return function(data) {$elt.value(extractData(data, path));};
+				return function(data) {$elt.value(extractData(data, path, $elt));};
 			} else {
-				return function(data) {$elt.html(extractData(data, path));};
+				return function(data) {$elt.html(extractData(data, path, $elt));};
 			}
 
 		} else {
 			var attr = exprParts[0].toLowerCase(), path = exprParts[1];
 			if (attr == "class") {
-				return function(data) {$elt.addClass(extractData(data, path));};
+				return function(data) {$elt.addClass(extractData(data, path, $elt));};
 			} else if ("text|html|value".indexOf(attr) != -1) {
-				return function(data) {$elt[attr](extractData(data, path));};
+				return function(data) {$elt[attr](extractData(data, path, $elt));};
 			} else {
-				return function(data) {$elt.attr(attr, extractData(data, path));};
+				return function(data) {$elt.attr(attr, extractData(data, path, $elt));};
 			}
 		}
 	}
