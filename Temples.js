@@ -111,19 +111,25 @@
 		Renderer.parse.call(this, this.$root);
 	}
 
+	/**
+	 * Parse a root element and its content to retrieve the bind expressions : data-bind and data-iterate
+	 * Then store them in a collection of rendering methods ready to be called on the data to render
+	 * @param $root
+	 */
 	Renderer.parse = function ($root) {
-		// parse the bind expressions of each live element
-		var bindings = this.bindings = [],
+
+		var bindings = this.bindings = [], // live expressions
 			notContainedInIterator = function () {
 				return ($(this).parentsUntil($root, "[data-iterate]").length == 0);
 			};
 
-		// bind the isolated elements not part of an iterator
+		// let's find the first-level binded elements
 		$root.add("*[data-bind]", $root)
 			.filter(notContainedInIterator)
 			.each(function (i, elt) {
+
 				var $elt = $(elt),
-					bindList = $elt.attr("data-bind").split(/\s*,\s*/); // separator is a comma ',' eventually preceded of followed by spaces
+					bindList = ($elt.attr("data-bind") || "").split(/\s*,\s*/); // separator is a comma ',' eventually preceded of followed by spaces
 
 				for (var i = 0, expr; expr = bindList[i++];) {
 					console.log("Binding element " + $elt[0] + " with " + expr);
@@ -136,8 +142,11 @@
 			.filter(notContainedInIterator)
 			.each(function (i, elt) {
 				var $elt = $(elt),
-					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each"),
-					template = $elt.children()[0],
+					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each");
+
+				if (!iterateExpr) return;
+
+				var	template = $elt.children()[0],
 					iterator = new Iterator($elt, iterateExpr, template);
 
 				console.log("Binding iterator " + $elt[0] + " with " + iterateExpr);
