@@ -1,10 +1,10 @@
 ![temples](https://raw.github.com/zipang/Temples/master/images/temples.png)
 
 # Synopsis
-Temples (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
-Temples is a declarative DOM-based rendering engine, depending on jQuery, that have a special ability for real-time/partial updates.
-Temples are just plain old HTML pages blocks or fragments with special `data-bind` attributes.
-Temples works inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
+`Temples` (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
+`Temples` is a declarative, DOM-based rendering engine, depending on jQuery, that has a special ability for real-time/partial updates.
+*Templates* are just plain old HTML pages blocks or fragments with special `data-bind` attributes.
+`Temples` works inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
 
 # Motivations
 
@@ -28,23 +28,23 @@ I want to :
 
 - Fully HTML5 compliant. Won't break your pages.
 - Declarative bindings.
-- Sub-templates use the same syntax to render the complexity of structured data.
+- Transparent rendering of structured data.
 - Can be used in Node.JS (with a special Jquery lite module) for server-side template rendering.
 
 # Installation
-There are a few ways to use `temples`.
+There are a few ways to use `Temples`.
 
 ##In the browser :
-Just include the `temples.js` script after jQuery.
+Just include the `Temples.js` script after jQuery.
 
 ```html
 <script src="http://code.jquery.com/jquery.js"></script>
-<script src="my/path/to/temples.js"></script>
+<script src="my/path/to/Temples.js"></script>
 ```
 
 ##With node.js :
 Install the library using npm or add it to your `package.json` file as a dependancy,
-then, simply do
+then, simply do :
 
 ```js
 var Temples = require("Temples");
@@ -53,18 +53,18 @@ var Temples = require("Temples");
 
 # Usage
 
-## Data binding
+## Declarative data binding with `data-bind`
 To create live templates from existing HTML markups, we just have to add the `data-bind` attributes on the elements to update.
 `data-bind` has a super-simple syntax but is very powerfull :
 
 * Expressions are of the form : `[value|text|html|<attr-name>]=<path.to.some.data>`
 * Multiple updates can be specified, separated by a comma ','.
 
-Here is for example the block of markup you wish to use to display the currently logged user.
+Here is for example the block of markup you'd wish to use to display the currently logged user.
 
 ```html
 <div id="logged-user">
-    <img title="avatar" src="http://avatar.com/johndoe" />
+    <img title="John DOE" src="http://avatar.com/johndoe" />
     <div class="active">John DOE</div>
 </div>
 ```
@@ -73,7 +73,7 @@ A simple binding would give us this :
 
 ```html
 <div id="logged-user">
-    <img data-bind="src=user.avatar, title=user.fullname" title="avatar" src="http://avatar.com/johndoe" />
+    <img data-bind="src=user.avatar, title=user.fullname" title="John DOE" src="http://avatar.com/johndoe" />
     <div data-bind="user.fullname, class=user.status" class="active">John DOE</div>
 </div>
 ```
@@ -107,10 +107,10 @@ is equivalent to :
 
 ## Data preparation
 
-Now, you just have to prepare your data to be able to render it through the template engine.
+Now, you just have to prepare the representation of your data to be able to render it through the template engine.
 
-`Temples` can easily access any structured data.
-`Temples` simply follows the path to each field/method that you declared inside the `data-bind` attribute by using the dotted notation '.'.
+`Temples` can easily access any structured data : it will simply follow the path to each field/method that you declared inside the `data-bind` attribute by using the dotted notation '.'.
+`Temples` doesn't provide any formatting facility (there are other libraries for that purpose) and expects only text values, so that you have to wrap your data (your Models) inside a presenter (or a ViewModel, depending of the terminology) to achieve proper formatting.
 
 So that a good contender for our preceding example could be :
 ```
@@ -118,12 +118,15 @@ So that a good contender for our preceding example could be :
     user: {
         firstname: "John",
         lastname: "DOE",
-        fullname: function() {return this.firstname + " " + this.lastname},
+        fullname: function() {return this.firstname + " " + this.lastname;},
         avatar: "http://avatar.com/johndoe",
-        status: "active"
+        status: "active",
+        websites: ["http://whoeis.john.doe", "http://johndoe.facebook.com", "http://johndoe.tumblr.com"]
     }
 }
 ```
+
+Note: We don't give you a clue here about how to actually retrieve the data from your Model layer and how to wrap it inside a ViewModel or Presenter or whatever.., we just show you here what kind of data *representation* `Temples` is able to deal with.
 
 ## Template registration
 To use a template, register it under a unique name and provide its content to `Temple.register()`.
