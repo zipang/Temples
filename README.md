@@ -2,12 +2,9 @@
 
 # Synopsis
 Temples (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
-
 Temples is a declarative DOM-based rendering engine, depending on jQuery, that have a special ability for real-time/partial updates.
-
 Temples are just plain old HTML pages blocks or fragments with special `data-bind` attributes.
-
-Temples work inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
+Temples works inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
 
 # Motivations
 
@@ -20,7 +17,7 @@ I want a template system that :
 - is able to work seamlessly with structured data with any levels of sub-elements.
 
 I want to :
-- use genuine HTML pages, full with example text, and transform them with just the addition of a few `data-bind attributes.
+- use genuine HTML pages, full with example text, and transform them with just the addition of a few `data-bind` attributes.
 - understand how it works in 2 minutes.
 
 # Status
@@ -57,17 +54,17 @@ var Temples = require("Temples");
 # Usage
 
 ## Data binding
-To create a template from HTML markups, you just need to add the `data-bind` attribute on the elements to update.
-`data-bind` has a simple syntax but is very powerfull. Multiple updates can be specified, you just have to separate each update clause by a comma.
-Each update expression is of the form :
+To create live templates from existing HTML markups, we just have to add the `data-bind` attributes on the elements to update.
+`data-bind` has a super-simple syntax but is very powerfull :
 
-    [value|text|html|<attr-name>]=<path.to.some.data>
+* Expressions are of the form : `[value|text|html|<attr-name>]=<path.to.some.data>`
+* Multiple updates can be specified, separated by a comma ','.
 
 Here is for example the block of markup you wish to use to display the currently logged user.
 
 ```html
 <div id="logged-user">
-    <img title="avatar" src="http://" />
+    <img title="avatar" src="http://avatar.com/johndoe" />
     <div class="active">John DOE</div>
 </div>
 ```
@@ -76,35 +73,35 @@ A simple binding would give us this :
 
 ```html
 <div id="logged-user">
-    <img data-bind="src=user.avatar, title=user.fullname" title="avatar" src="" />
+    <img data-bind="src=user.avatar, title=user.fullname" title="avatar" src="http://avatar.com/johndoe" />
     <div data-bind="user.fullname, class=user.status" class="active">John DOE</div>
 </div>
 ```
 
-Notice how we don't have to get rid of the example text, so that the markup still displays nicely in the browser.
+Notice how *we don't have to get rid* of the sample text, so that the markup still displays nicely in the browser.
 
 Depending on the context, `value=` or `html=` can be ommited so that :
 
 ```html
-<div data-bind="html=user.name"></div>
+<div data-bind="html=user.name" />
 ```
 
 is equivalent to :
 
 ```html
-<div data-bind="user.name"></div>
+<div data-bind="user.name" />
 ```
 
 and
 
 ```html
-<input type="text" data-bind="value=user.name"></input>
+<input type="text" data-bind="value=user.name" />
 ```
 
 is equivalent to :
 
 ```html
-<input type="text" data-bind="user.name"></input>
+<input type="text" data-bind="user.name" />
 ```
 
 
@@ -112,9 +109,11 @@ is equivalent to :
 
 Now, you just have to prepare your data to be able to render it through the template engine.
 
-`Temples` can easily use any structured data. You just have to design the fields or methods to be accessed with the dotted notation '.' inside your 'data-bind' attributes.
+`Temples` can easily access any structured data.
+`Temples` simply follows the path to each field/method that you declared inside the `data-bind` attribute by using the dotted notation '.'.
 
-So that a good contender for our example could be :
+So that a good contender for our preceding example could be :
+```
 {
     user: {
         firstname: "John",
@@ -124,9 +123,11 @@ So that a good contender for our example could be :
         status: "active"
     }
 }
+```
 
 ## Template registration
-To use a template, register it under a unique name and provide its content to `Temple.register()`. The content can be a DOM id, a DOM element, or a string using the Temples syntax.
+To use a template, register it under a unique name and provide its content to `Temple.register()`.
+The content can be a DOM id, a DOM element, or a string using the Temples syntax.
 
 Then call the `Temples.render()` method with any structured data.
 
@@ -140,7 +141,6 @@ Then call the `Temples.render()` method with any structured data.
 var Temples = require('Temples');
 
 Temples.register("logged-user", "#logged-user");
-Temples.render("logged-user", { "firstname": "James", "lastname": "Wood" });
 
 ```
 
@@ -162,16 +162,24 @@ myPage.destroy();
 ```
 
 
+## Collections and the `data-iterate` attribute
 
-## Collections
+`Temples` can easily iterate over collections to build a list of items.
+This is done with the help of the special `data-iterate` attribute that will design the collection to iterate on,
+optionally name the new variable to hold the iteration value,
+and will use *the first-level sub-template* to render the child elements :
 
-Temples can easily iterate over collections and build a list of items, with a special `data-iterate` attribute that will design the collection,
-and will use the first level sub-template to render the child elements :
+Note: If no variable name is provided, `Temples` will automatically choose one by suppressing the final 's' on the collection's name.
 
 ```html
-<ul id="tags" data-iterate="article.tags">
-    <li><a data-bind="tag.label, href=tag.url" >war</a></li>
-    <li><a href="#war">war</a></li><!-- This second list item is an example that will not be used to render the template -->
+<!-- Introducing a list of quotes -->
+<div data-iterate="quote: article.quotes">
+    <div class="quote" data-bind="quote">I ain't a native : I was born there!</div>
+</div>
+<!-- Now a list of tags -->
+<ul data-iterate="article.tags"><!-- Will automatically iterate on the 'tag' variable -->
+    <li><a data-bind="tag.label, href=tag.url" >peace</a></li>
+    <li><a href="#war">war</a></li><!-- This second list item wont be used to render the template -->
 </ul>
 ```
 
@@ -179,8 +187,12 @@ and will use the first level sub-template to render the child elements :
 
 var dataPresenter = {
     article : {
-        title: "Why did Steve Job leave the train ?",
-        tags: ["lolcats", "steve sander"],
+        title: "The Great Race",
+        quotes: [
+            "Quiet! Citizens of Boracho! Quiet!",
+            "Pardon me Mr Partner. Who is this Texas Jack?",
+            "I ain't a native : I was born there!"]
+        tags: ["boracho", "blake edwards", "jack lemmon", "race", "automobiles"]
         // ...
     }
 ];
@@ -189,6 +201,40 @@ Temples.update("article", dataPresenter);
 
 ```
 
+## Conditional rendering
+
+Another useful feature is the possibility to associate the rendering of a block element to a condition.
+This is done with the `data-render-if` attribute, whose value must evaluate to a boolean condition.
+
+```html
+<!-- Displays a special icon is this article is 'featured' -->
+<div class="icon" data-render-if="article.featured">
+  <img src="featured.png" />
+</div>
+
+<!-- Displays another icon is this article is 'popular' -->
+<div class="icon" data-render-if="article.popular">
+    <img src="popular.png" />
+</div>
+```
+
+The test can be done against a function if needed :
+
+```js
+
+var dataPresenter = {
+    article : {
+        featured: true,
+        popular: function() {
+            return (this.comments.length > 20);
+        }
+        // Other properties omitted for brevity...
+    }
+];
+
+Temples.update("article", dataPresenter);
+
+```
 
 # API
 
