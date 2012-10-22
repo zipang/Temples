@@ -83,7 +83,7 @@
 		var update = new SimpleBinding($elt, expr),
 			renderCondition = $elt.attr("data-render-if");
 
-		if (renderCondition) { // the rendering of this tag is subkect to the evaluation of a condition
+		if (renderCondition) { // the rendering of this tag is subject to the evaluation of a condition
 			return function(data) {
 				if (extractData(data, renderCondition))  {
 					update(data);
@@ -129,31 +129,22 @@
 				return $elt.attr("data-iterate") || $elt.attr("data-each");
 			},
 			notContainedInIterator = function () {
-				return ($(this).parentsUntil($root, "[data-iterate]").length == 0);
-			};
-
-		// bind the first level iterators
-		var iterators = (isIterator($root)) ? $root : $("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator);
-
-		iterators
-			.each(function (i, elt) {
+				return ($(this).parentsUntil($root, "[data-iterate], [data-each]").length == 0);
+			},
+			bindIterator = function (i, elt) {
 				var $elt = $(elt),
-					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each");
+					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each"),
 					template = $elt.children()[0],
 					iterator = new Iterator($elt, iterateExpr, template);
 
-				console.log("Binding iterator " + $elt[0] + " with " + iterateExpr);
+				console.log("Binding iterator " + elt + " with " + iterateExpr);
 				bindings.push(function (data) {
 					iterator.render(data);
 				});
 
 				$elt.removeAttr("data-iterate data-each");
-			});
-
-		// let's find the first-level binded elements
-		$root.add("*[data-bind], *[data-render-if]", $root)
-			.filter(notContainedInIterator)
-			.each(function (i, elt) {
+			},
+			bind = function (i, elt) {
 
 				var $elt = $(elt),
 					renderCondition = $elt.attr("data-render-if"),
@@ -172,8 +163,17 @@
 				}
 
 				$elt.removeAttr("data-bind data-render-if");
-			});
+			};;
 
+		// bind the first level iterators
+		if (isIterator($root)) {
+			bindIterator($root);
+			bind($root);
+
+		} else {
+			$("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
+			$("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).each(bind);
+		}
 
 	}
 	Renderer.prototype = {
