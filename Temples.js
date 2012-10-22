@@ -149,6 +149,8 @@
 						bindings.push(new Binding($elt, expr));
 					}
 				}
+
+				$elt.removeAttr("data-bind data-render-if");
 			});
 
 		// bind the first level iterators
@@ -167,6 +169,8 @@
 				bindings.push(function (data) {
 					iterator.render(data);
 				});
+
+				$elt.removeAttr("data-iterate data-each");
 			});
 
 	}
