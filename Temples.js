@@ -129,6 +129,27 @@
 				return ($(this).parentsUntil($root, "[data-iterate]").length == 0);
 			};
 
+
+		// bind the first level iterators
+		$root.add("*[data-iterate], *[data-each]", $root)
+			.filter(notContainedInIterator)
+			.each(function (i, elt) {
+				var $elt = $(elt),
+					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each");
+
+				if (!iterateExpr) return;
+
+				var	template = $elt.children()[0],
+					iterator = new Iterator($elt, iterateExpr, template);
+
+				console.log("Binding iterator " + $elt[0] + " with " + iterateExpr);
+				bindings.push(function (data) {
+					iterator.render(data);
+				});
+
+				$elt.removeAttr("data-iterate data-each");
+			});
+
 		// let's find the first-level binded elements
 		$root.add("*[data-bind], *[data-render-if]", $root)
 			.filter(notContainedInIterator)
@@ -153,25 +174,6 @@
 				$elt.removeAttr("data-bind data-render-if");
 			});
 
-		// bind the first level iterators
-		$root.add("*[data-iterate], *[data-each]", $root)
-			.filter(notContainedInIterator)
-			.each(function (i, elt) {
-				var $elt = $(elt),
-					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each");
-
-				if (!iterateExpr) return;
-
-				var	template = $elt.children()[0],
-					iterator = new Iterator($elt, iterateExpr, template);
-
-				console.log("Binding iterator " + $elt[0] + " with " + iterateExpr);
-				bindings.push(function (data) {
-					iterator.render(data);
-				});
-
-				$elt.removeAttr("data-iterate data-each");
-			});
 
 	}
 	Renderer.prototype = {
