@@ -51,7 +51,7 @@
 			var path = exprParts[0],
 				tagName = $elt[0].tagName.toLowerCase(); // normalize the name of the tag ('div', 'input', 'select', etc..)
 			if ("input|select".indexOf(tagName) != -1) {
-				return function(data) {$elt.value(extractData(data, path, $elt));};
+				return function(data) {$elt.val(extractData(data, path, $elt));};
 			} else {
 				return function(data) {$elt.html(extractData(data, path, $elt));};
 			}
@@ -186,7 +186,7 @@
         register: function(name, template) {
 			if (!template) {
 				// load template content from name
-				if (name.startsWith("#")) { // a DOM element ID
+				if (name.indexOf("#") == 0) { // a DOM element ID
 					template = $(name);
 				}
 			}
