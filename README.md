@@ -171,6 +171,7 @@ and will use *the first-level sub-template* to render the child elements :
 
 Note: If no variable name is provided, `Temples` will automatically choose one by suppressing the final 's' on the collection's name.
 
+
 ```html
 <!-- Introducing a list of quotes -->
 <div data-iterate="quote: article.quotes">
@@ -199,6 +200,32 @@ var dataPresenter = {
 
 Temples.update("article", dataPresenter);
 
+```
+
+
+### Alternate syntax:
+
+This attribute offers several syntactical variants to suit best your expressive needs:
+
+* `data-each` can be used in lieu et place of `data-iterate`.
+* The variable name can be introduce with a ':' or with the 'from' keyword.
+
+So that each of these iterative blocks have the same meaning: (content omitted for brevity)
+
+```html
+<div data-iterate="article.quotes">...</div>
+```
+
+```html
+<div data-iterate="quote: article.quotes" >...</div>
+```
+
+```html
+<div data-iterate="quote from article.quotes" >...</div>
+```
+
+```html
+<div data-each="quote from article.quotes" >...</div>
 ```
 
 ## Conditional rendering
