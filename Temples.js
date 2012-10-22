@@ -167,8 +167,8 @@
 
 		// bind the first level iterators
 		if (isIterator($root)) {
-			bindIterator($root);
-			bind($root);
+			bindIterator(0, $root);
+			bind(0, $root);
 
 		} else {
 			$("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
