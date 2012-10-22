@@ -26,6 +26,7 @@
 			parent = found;
 			found = found[key];
 		}
+		console.log("extract Data : ", data, path, found);
 		return (typeof found == "function") ? found.call(parent, $elt) : found || "";
 	}
 
@@ -134,7 +135,7 @@
 			bindIterator = function (i, elt) {
 				var $elt = $(elt),
 					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each"),
-					template = $elt.children()[0],
+					template = $elt.children().first(),
 					iterator = new Iterator($elt, iterateExpr, template);
 
 				console.log("Binding iterator " + elt + " with " + iterateExpr);
@@ -157,7 +158,7 @@
 					// each bind expression is separated by a comma ',' eventually preceded of followed by spaces
 					var boundList = (bindExpression || "").split(/\s*,\s*/);
 					for (var i = 0, expr; expr = boundList[i++];) {
-						console.log("Binding element " + $elt[0] + " with " + expr);
+						console.log("Binding element " + elt + " with " + expr);
 						bindings.push(new Binding($elt, expr));
 					}
 				}
