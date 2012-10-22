@@ -166,7 +166,7 @@
 				$elt.removeAttr("data-bind data-render-if");
 			};
 
-		// bind the first level iterators
+		// bind the first level iterator
 		if (isIterator($root)) {
 			bindIterator(0, $root);
 			bind(0, $root);
@@ -192,11 +192,6 @@
 		},
 		destroy:function () {
 			this.bindings = this.$root = null;
-		},
-		toString: function() {
-			return this.$root[0].tagName.toLowerCase()
-				+ (this.$root.attr("id") ? "#" + this.$root.attr("id") : "")
-				+ (this.$root.attr("class") ? "." + this.$root.attr("class") : "");
 		}
 	};
 
@@ -246,11 +241,6 @@
 		}
 		delete data[itemKey];
 	};
-	Iterator.prototype.toString = function() {
-		return this.seed + " iterator "
-			+ Renderer.prototype.toString.call(this);
-	}
-
 
 	// Façade
 	var Temples = {
