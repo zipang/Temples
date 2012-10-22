@@ -172,8 +172,8 @@
 			bind(0, $root);
 
 		} else {
-			$root.add("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
 			$root.add("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).each(bind);
+			$("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
 		}
 
 	}
@@ -192,6 +192,11 @@
 		},
 		destroy:function () {
 			this.bindings = this.$root = null;
+		},
+		toString: function() {
+			return this.$root.tagName
+				+ (this.$root.attr("id") ? "#" + this.$root.attr("id") : "")
+				+ (this.$root.className() ? "." + this.$root.className() : "");
 		}
 	};
 
@@ -240,6 +245,10 @@
 			this.$root.append(this.template.render(data).clone()); // render the line template and add it to the root
 		}
 		delete data[itemKey];
+	};
+	Iterator.prototype.toString = function() {
+		return this.seed + " iterator "
+			+ Renderer.prototype.toString.call(this);
 	}
 
 
