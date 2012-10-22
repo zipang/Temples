@@ -119,7 +119,7 @@
 			};
 
 		// bind the isolated elements not part of an iterator
-		$("*[data-bind]", $root)
+		$root.add("*[data-bind]", $root)
 			.filter(notContainedInIterator)
 			.each(function (i, elt) {
 				var $elt = $(elt),
@@ -132,7 +132,7 @@
 			});
 
 		// bind the first level iterators
-		$("*[data-iterate], *[data-each]", $root)
+		$root.add("*[data-iterate], *[data-each]", $root)
 			.filter(notContainedInIterator)
 			.each(function (i, elt) {
 				var $elt = $(elt),
