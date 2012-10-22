@@ -194,9 +194,9 @@
 			this.bindings = this.$root = null;
 		},
 		toString: function() {
-			return this.$root.tagName
+			return this.$root[0].tagName.toLowerCase()
 				+ (this.$root.attr("id") ? "#" + this.$root.attr("id") : "")
-				+ (this.$root.className() ? "." + this.$root.className() : "");
+				+ (this.$root.attr("class") ? "." + this.$root.attr("class") : "");
 		}
 	};
 
