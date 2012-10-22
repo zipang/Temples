@@ -164,7 +164,7 @@
 				}
 
 				$elt.removeAttr("data-bind data-render-if");
-			};;
+			};
 
 		// bind the first level iterators
 		if (isIterator($root)) {
@@ -172,8 +172,8 @@
 			bind(0, $root);
 
 		} else {
-			$("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
-			$("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).each(bind);
+			$root.add("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
+			$root.add("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).each(bind);
 		}
 
 	}
