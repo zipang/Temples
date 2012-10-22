@@ -2,8 +2,11 @@
 
 # Synopsis
 Temples (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
+
 Temples is a declarative DOM-based rendering engine, depending on jQuery, that have a special ability for real-time/partial updates.
-Temples are just plain old HTML pages blocks or fragments with special `data-bind attributes`
+
+Temples are just plain old HTML pages blocks or fragments with special `data-bind` attributes.
+
 Temples work inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
 
 # Motivations
@@ -53,13 +56,83 @@ var Temples = require("Temples");
 
 # Usage
 
-## Template registration
-To re-use being able to use it, `temples` will try to match the key in the data to an `id` in the
-tag, since both should be unique.
+## Data binding
+To create a template from HTML markups, you just need to add the `data-bind` attribute on the elements to update.
+`data-bind` has a simple syntax but is very powerfull. Multiple updates can be specified, you just have to separate each update clause by a comma.
+Each update expression is of the form :
+
+    [value|text|html|<attr-name>]=<path.to.some.data>
+
+Here is for example the block of markup you wish to use to display the currently logged user.
 
 ```html
 <div id="logged-user">
-    <span data-bind="firstname">John<span> <span data-bind="lastname">DOE<span> was here.
+    <img title="avatar" src="http://" />
+    <div class="active">John DOE</div>
+</div>
+```
+
+A simple binding would give us this :
+
+```html
+<div id="logged-user">
+    <img data-bind="src=user.avatar, title=user.fullname" title="avatar" src="" />
+    <div data-bind="user.fullname, class=user.status" class="active">John DOE</div>
+</div>
+```
+
+Notice how we don't have to get rid of the example text, so that the markup still displays nicely in the browser.
+
+Depending on the context, `value=` or `html=` can be ommited so that :
+
+```html
+<div data-bind="html=user.name"></div>
+```
+
+is equivalent to :
+
+```html
+<div data-bind="user.name"></div>
+```
+
+and
+
+```html
+<input type="text" data-bind="value=user.name"></input>
+```
+
+is equivalent to :
+
+```html
+<input type="text" data-bind="user.name"></input>
+```
+
+
+## Data preparation
+
+Now, you just have to prepare your data to be able to render it through the template engine.
+
+`Temples` can easily use any structured data. You just have to design the fields or methods to be accessed with the dotted notation '.' inside your 'data-bind' attributes.
+
+So that a good contender for our example could be :
+{
+    user: {
+        firstname: "John",
+        lastname: "DOE",
+        fullname: function() {return this.firstname + " " + this.lastname},
+        avatar: "http://avatar.com/johndoe",
+        status: "active"
+    }
+}
+
+## Template registration
+To use a template, register it under a unique name and provide its content to `Temple.register()`. The content can be a DOM id, a DOM element, or a string using the Temples syntax.
+
+Then call the `Temples.render()` method with any structured data.
+
+```html
+<div id="logged-user">
+    <span data-bind="user.firstname">John<span> <span data-bind="user.lastname">DOE<span> was here.
 </div>
 ```
 
@@ -71,17 +144,18 @@ Temples.render("logged-user", { "firstname": "James", "lastname": "Wood" });
 
 ```
 
-## Explicit constructions
-Another way is to build the template's renderer and to keep an handle on it for later re-use and disposal.
+## Explicit Renderers
+
+Another way is to explicitely build your Renderer so that you can use it directly without the need to specify its name.
 
 ```js
 var myPage = new Temples.Renderer(window.document);
 
-// Use the provided data to render the full page
-myPage.render({ some: "data", more: "to come", ... });
+// Use render with the full data. Target elements not contained in the provided data will be rendered as blank (empty) elements.
+myPage.render({ some: "data", more: "coming soon", ... });
 
 // update just an element in the page
-myPage.update({ "some": "new value" });
+myPage.update({ "path.to.some.element: "new value" });
 
 // later..
 myPage.destroy();
