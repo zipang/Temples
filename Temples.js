@@ -172,7 +172,7 @@
 			bind(0, $root);
 
 		} else {
-			$root.add("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).each(bind);
+			$("*[data-bind], *[data-render-if]", $root).filter(notContainedInIterator).add($root).each(bind);
 			$("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator).each(bindIterator);
 		}
 
