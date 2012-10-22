@@ -125,21 +125,21 @@
 	Renderer.parse = function ($root) {
 
 		var bindings = this.bindings = [], // live expressions
+			isIterator = function($elt) {
+				return $elt.attr("data-iterate") || $elt.attr("data-each");
+			},
 			notContainedInIterator = function () {
 				return ($(this).parentsUntil($root, "[data-iterate]").length == 0);
 			};
 
-
 		// bind the first level iterators
-		$root.add("*[data-iterate], *[data-each]", $root)
-			.filter(notContainedInIterator)
+		var iterators = (isIterator($root)) ? $root : $("*[data-iterate], *[data-each]", $root).filter(notContainedInIterator);
+
+		iterators
 			.each(function (i, elt) {
 				var $elt = $(elt),
 					iterateExpr = $elt.attr("data-iterate") || $elt.attr("data-each");
-
-				if (!iterateExpr) return;
-
-				var	template = $elt.children()[0],
+					template = $elt.children()[0],
 					iterator = new Iterator($elt, iterateExpr, template);
 
 				console.log("Binding iterator " + $elt[0] + " with " + iterateExpr);
