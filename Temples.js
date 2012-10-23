@@ -31,7 +31,7 @@
 	 * Access to a field in the provided object by its path
 	 * @param data
 	 * @param path, ex : "article.author.name"
-	 * @param $elt optional
+	 * @param $elt optionally passed when the property is a method indeed
 	 * @return {String|Boolean}
 	 */
 	function evalProperty(data, path, $elt) {
@@ -263,8 +263,7 @@
 
 		// bind the first level iterator
 		if (Renderer.isIterator($root)) {
-			bindIterator(0, $root);
-			bind(0, $root);
+			$root.each(bindIterator).each(bind);
 
 		} else {
 			$("*[data-bind], *[data-render-if]", $root).filter(firstLevel).add($root).each(bind);
