@@ -50,6 +50,12 @@ then, simply do :
 var Temples = require("Temples");
 ```
 
+# Tutorials, examples
+
+For the moment, you can have a play with the current beta version here :
+- [Blog template example]
+
+[Blog template example]: http://codepen.io/zipang/pen/JEmfL
 
 # Usage
 
@@ -308,7 +314,7 @@ This method will update all binded elements with the values found (or not found)
 Therefore, the lack of data for a binded element will resume in a blank ('') rendering.
 ```
 
-### update()
+### update() - Coming soon
 
 ```
 function Renderer#update(expr, ...)
