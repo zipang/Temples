@@ -20,14 +20,6 @@ I want to :
 - use genuine HTML pages, full with example text, and transform them with just the addition of a few `data-bind` attributes.
 - understand how it works in 2 minutes.
 
-# Status
-
-`Temples` is currently in alpha.
-Test suite is coming soon.
-Feel free to comment about the syntax, features..
-
-[![Build Status](https://secure.travis-ci.org/zipang/temples.png)](http://travis-ci.org/zipang/temples)
-
 # Features
 
 - Fully HTML5 compliant. Won't break your pages.
@@ -54,9 +46,13 @@ then, simply do :
 var Temples = require("Temples");
 ```
 
-# Tutorials, examples
+# Status, Tutorials, examples
 
-For the moment, you can have a play with the current beta version here :
+`Temples` is currently in alpha.
+Test suite is coming soon.
+Feel free to comment about the syntax, features..
+
+For the moment, you can have a play with the current pre-release version here :
 - [Blog template example]
 
 [Blog template example]: http://codepen.io/zipang/pen/JEmfL
