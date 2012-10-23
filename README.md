@@ -22,6 +22,10 @@ I want to :
 
 # Status
 
+`Temples` is currently in alpha.
+Test suite is coming soon.
+Feel free to comment about the syntax, features..
+
 [![Build Status](https://secure.travis-ci.org/zipang/temples.png)](http://travis-ci.org/zipang/temples)
 
 # Features
