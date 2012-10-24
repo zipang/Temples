@@ -134,11 +134,11 @@ So that a good contender for our preceding example could be :
 
 Note: We don't give you a clue here about how to actually retrieve the data from your Model layer and how to wrap it inside a ViewModel or Presenter or whatever.., we just show you here what kind of data *representation* `Temples` is able to deal with.
 
-## Template registration
-To use a template, register it under a unique name and provide its content to `Temple.register()`.
-The content can be a DOM id, a DOM element, or a string using the Temples syntax.
+## Templates pre-registration and rendering
+To prepare a template, you can register it under a unique name with `Temples.prepare(<name>, <content>)`.
+When registrating a template, the content can be a DOM id (string starting with a `#`), a DOM element, or a string containing the full template's content.
 
-Then call the `Temples.render()` method with any structured data.
+Then call the `Temples.render(<name>, <data>)` method with any structured data.
 
 ```html
 <div id="logged-user">
@@ -147,11 +147,53 @@ Then call the `Temples.render()` method with any structured data.
 ```
 
 ```js
-var Temples = require('Temples');
 
-Temples.register("logged-user", "#logged-user");
+// prepare the template
+Temples.prepare("logged-user", "#logged-user");
+
+// Then use it later to display some data
+$("frm_identification").on("submit", function(evt) {
+
+    // serialize the form
+    var user = new User($(this).serialize());
+
+    // authenticate..
+    (...)
+
+    // retrieve full user profile
+    $.get("/users/:id", user.id, {
+
+        success: function(user) {
+            Temples.render("logged-user", user);
+        }
+    });
+
+});
 
 ```
+
+These notations are equivalent :
+
+```js
+Templates.prepare("#user-tpl"); // pass the ID, the name will automatically be set to 'user-tpl'
+```
+
+```js
+Templates.prepare("user-tpl", "#user-tpl"); // pass the ID
+```
+
+```js
+Templates.prepare("user-tpl", $("#user-tpl")); // pass the DOM element
+```
+
+```js
+Templates.prepare("user-tpl", $("#user-tpl").html()); // pass the content
+```
+
+```js
+Templates.register("user-tpl", $("#user-tpl").html()); // register is just a synonym for prepare
+```
+
 
 ## Explicit Renderers
 
