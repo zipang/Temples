@@ -2,7 +2,7 @@
  * Temples.js
  * ============
  * Author: Eidolon Labs (zipang)
- * Source : http://github.com/zipang/temples
+ * Source : http://github.com/zipang/Temples
  * Date: 2012-10-17
  */
 (function define(context, $) {
@@ -201,7 +201,11 @@
 	 * - "tag : article.tags"         // ':' or 'from' are synonyms
 	 */
 	Renderer.isIterator = Iterator.loopExpression = function($elt) {
-		return $elt.attr("data-iterate") || $elt.attr("data-each");
+		try {
+			return $elt.attr("data-iterate") || $elt.attr("data-each");
+		} catch (err) {
+			return ""; // needed when using jquip on window.document
+		}
 	};
 	Iterator.extractLoop = function(loopExpr, dest) {
 		var expr  = loopExpr.replace("from", ":"),
@@ -277,7 +281,7 @@
 	 */
 	var Temples = {
 		Renderer:Renderer,
-		register:function (name, template) {
+		prepare:function (name, template) {
 			if (!template) {
 				// load template content from name
 				if (name.indexOf("#") == 0) { // a DOM element ID
@@ -291,9 +295,15 @@
 			delete templates[name];
 		},
 		render:function (name, data) {
-			(templates[name] || Temples.register(name)).render(data);
+			var dom;
+			if (!data && typeof name == "object") {
+				data = name;
+				dom = Temples.prepare(name = "window.document", $("html"));
+			}
+			(dom || templates[name] || Temples.prepare(name)).render(data);
 		}
 	};
+	Temples.register = Temples.prepare;
 
 	if (context === window) { // browser context
 		context["Temples"] = Temples; // exports Temples under its name in the global space
@@ -301,4 +311,4 @@
 		context.exports = Temples;
 	}
 
-})(this, this.jQuery || this.ender || this.jquip || require("jQuery"));
+})(this, this.jQuery || this.ender || this.jquip || require("./lib/jquery4node"));
