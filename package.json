@@ -1,12 +1,12 @@
 {
-  "name": "temples",
+  "name": "Temples",
   "description": "HTML Templates that you won't hate",
   "author": "zipang",
   "organization": "Eidolon Labs",
   "version": "0.1.1",
-  "main": "./lib/temples.js",
-  "repository": "git://github.com/zipang/temples.git",
-  "homepage": "https://zipang.github.com/temples",
+  "main": "./Temples.js",
+  "repository": "git://github.com/zipang/Temples.git",
+  "homepage": "https://zipang.github.com/Temples",
   "keywords": [ "templates", "html", "jquery" ],
   "tags": [ "templates", "html", "jquery" ]
 }
