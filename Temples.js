@@ -4,6 +4,7 @@
  * Author: Eidolon Labs (zipang)
  * Source : http://github.com/zipang/Temples
  * Date: 2012-10-17
+ * v0.1.1
  */
 (function define(context, $) {
 
