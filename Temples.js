@@ -3,14 +3,14 @@
  * ============
  * Author: Eidolon Labs (zipang)
  * Source : http://github.com/zipang/Temples
- * Date: 2012-10-17
- * v0.1.1
+ * Date: 2012-10-29
+ * v0.2.0
  */
 (function define(context, $) {
 
 	if (!$) throw "Temples relies on a jQuery compatible DOM search engine and DOM manipulator";
 
-	var templates = {}; // live templates indexed by name
+	var templates = {};
 
 	// Utilities
 
@@ -28,40 +28,274 @@
 		return tagName + (id ? "#" + id : "") + (className ? "." + className : "");
 	}
 
+	function comment(whattosay) {
+		return $("<!--" + whattosay + "-->");
+	}
+
 	/**
 	 * Access to a field in the provided object by its path
-	 * @param data
 	 * @param path, ex : "article.author.name"
-	 * @param $elt optionally passed when the property is a method indeed
+	 * @param data, ex : {article: {title: "", author: {..}}}
+	 * @param $elt {optional} passed to invoke a plugin method that could directly update the element
 	 * @return {String|Boolean}
 	 */
-	function evalProperty(data, path, $elt) {
+	function evalProperty(path, data, $elt) {
 		var key, parent, found = data,
 			steps = (path || "").trim().split(".");
 		while (found && (key = steps.shift())) {
 			parent = found;
 			found = found[key];
 		}
-		console.log("extract Data : ", data, path, ">", found);
 		return (typeof found == "function") ? found.call(parent, $elt) : found || "";
 	}
 
+	// Renderer base prototype
+
+	/**
+	 * Prototype of all Renderers
+	 * @constructor
+	 */
+	function Renderer() {}
+	Renderer.prototype = {
+		/**
+		 * Cause all the bindings to render their elements with the provided data
+		 */
+		render:function (data) {
+            var bindings = this.bindings,
+                l = bindings.length;
+			for (var i = 0; i < l; i++) {
+				bindings[i](data);
+			}
+			return this.$root;
+		},
+		/**
+		 * Render the data and output the flat HTML
+		 * @return {String} 
+		 */
+		output:function (data) {
+			return this.render(data).html();
+		},
+		/**
+		 * Exports the current HTML rendering
+		 * @return {String} 
+		 */
+		toHtml:function () {
+			return this.$root.html();
+		},
+		destroy:function () {
+			this.bindings = this.$root = null;
+		}
+	};
+
+
+	/**
+	 * The most simple of all renderers
+	 * Works only with one element and one attribute
+	 */
+	function AttributeRenderer($elt, expr) {
+		this.$root = $elt;
+		this.bindings = [Bindings.updater($elt, expr)];
+
+	}
+	AttributeRenderer.prototype = new Renderer();
+    AttributeRenderer.prototype.toString = function() {
+        return "AttributeRenderer(" + displayNode(this.$root) + ")";
+    };
+
+	/**
+	 * Deals with multiple attributes bindings
+	 * on a single element
+	 * @param dataBindExpr a comma separated list of binding expressions
+	 */
+	function SimpleElementRenderer($elt, dataBind) {
+		this.$root = $elt;
+		var bindings = this.bindings = [],
+            expr, exprList = dataBind.split(",");
+		while (expr = exprList.pop())
+			bindings.push(Bindings.updater($elt, expr.trim()));
+	}
+	SimpleElementRenderer.prototype = new Renderer();
+    SimpleElementRenderer.prototype.toString = function() {
+        return "SimpleElementRenderer(" + displayNode(this.$root) + ")";
+    };
+
+	/**
+	 * Deals with multiple attributes bindings
+	 * on a single element with a condition
+	 * @param dataBindExpr a comma separated list of binding expressions
+	 */
+	function ConditionalElementRenderer($elt, cond, dataBind) {
+        if (!arguments.length) return; // to use as empty prototype
+
+		this.$root = $elt;
+		this.condition = cond;
+		var conditionalbindings = this.conditionalbindings = [];
+
+        if (dataBind) {
+            var exprList = dataBind.split(",");
+            for (var i = 0, expr; expr = exprList[i++];) {
+                conditionalbindings.push(Bindings.updater($elt, expr.trim()));
+            }
+        }
+
+        var self = this; // bindings methods must allways be created within a closure so that they do not depend on the 'this' keyword
+        this.bindings = [function(data) {
+            if (evalProperty(cond, data)) {
+                for (var i = 0, render; render = conditionalbindings[i++];) {
+                    render(data);
+                }
+
+                self.reappear();
+            } else {
+                // replace our element with a vibrant placeholder
+                self.disappear("Temples says: " + cond + "=false");
+            }
+        }];
+	}
+	$.extend(
+		ConditionalElementRenderer.prototype = new Renderer(),
+		{
+			disappear: function(why) {
+				if (!this.placeHolder) {
+					this.$root.replaceWith(
+						this.placeHolder = comment(why)
+					)
+				}
+			},
+			reappear: function() {
+				if (this.placeHolder) {
+					this.placeHolder.replaceWith(this.$root);
+					this.placeHolder = null;
+				}
+			}
+		}
+	); // ConditionalElementRenderer.prototype
+    ConditionalElementRenderer.prototype.toString = function() {
+        return "ConditionalElementRenderer(" + displayNode(this.$root) + " if " + this.condition + ")";
+    };
+
+
+	/**
+	 * A specific type of Renderer that iterates 
+	 * a sub template over values of a collection
+	 * 
+	 * @param $elt
+	 * @param loopExpr value of 'data-iterate' or 'data-each'
+	 * the loop expression has the following forms :
+	 * - "blog.articles"        	  // 'article' will automatically be derived as the variable to bind
+	 * - "child from family.children" // 'child' is explicitely designed to be the variable bound in the loop
+	 * - "tag : article.tags"         // ':' or 'from' are synonyms
+     * @param cond {optional}
+     * @param dataBind {optional}
+	 * @constructor
+	 */
+	function ListRenderer($elt, loopExpr, cond, dataBind) {
+
+        this.$root = $elt;
+        // the first child block of an ListRenderer is the template used to loop on collection items
+        var template = this.template = new TemplateRenderer($elt.children().first());
+
+		// Parse the loop expression
+		var expr  = loopExpr.replace("from", ":"), // from and ':' are equivalents
+			parts = expr.split(":"),
+			collectionPath = parts[1] || parts[0];
+
+		// the seed is the name of the collection to iterate on
+		var seed = this.seed = collectionPath.trim();
+
+		// several syntax variants are allowed
+		if (parts.length == 2) { // <varName> : <path.to.collection>
+			this.varName = parts[0].trim();
+
+		} else { // extract the variable name from the last member of the collection path
+			this.varName = this.seed.split(".").pop();  // the last part of the path
+			this.varName = this.varName.replace(/s*$/, ""); // remove trailing s
+		}
+
+        // Define the bindings
+        var varName = this.varName;
+
+        ConditionalElementRenderer.call(this, $elt, cond, dataBind);
+
+        // render the line template if the condition is passed
+        this.conditionalbindings.push(function(data) {
+            var collection = evalProperty(seed, data);
+
+            $elt.empty();
+            for (var i = 0, l = collection.length; i < l; i++) {
+                // Add the item's value to the data object
+                data[varName] = collection[i];
+                $elt.append(template.render(data).clone()); // render the line template and add it to the root
+            }
+            delete data[varName];
+
+        });
+    }
+	ListRenderer.prototype = new ConditionalElementRenderer();
+    ListRenderer.prototype.toString = function() {
+        return "ListRenderer(" + displayNode(this.$root) + ")";
+    };
+
+
+	/**
+	 * Renderer utils
+	 */
+	Renderer.isListRenderer = ListRenderer.loopExpression = function($elt) {
+		try {
+			return $elt.attr("data-iterate") || $elt.attr("data-each");
+		} catch (err) {
+			return ""; // needed when using jquip on window.document
+		}
+	};
+
+	function TemplateRenderer($elements) {
+		this.$root = $elements;
+		var bindings = this.bindings = [];
+
+		$elements.each(function(i, elt) {
+			var $targets = Renderer.targets($(elt));
+			$targets.each(function(i, elt) {
+				var renderer = Renderer.Factory($(elt));
+				Array.prototype.push.apply(bindings, renderer.bindings);
+            });
+		});
+	}
+    TemplateRenderer.prototype = new Renderer();
+    TemplateRenderer.prototype.toString = function() {
+        return "TemplateRenderer(" + displayNode(this.$root) + ")";
+    };
+
+	Renderer.targets = function($root) {
+
+		// find all data-bound child from this root element
+		var isRenderer = function() {
+                return ($(this).attr("data-bind") || $(this).attr("data-render-if"));
+            }, firstLevel = function () { // filter elements not contained in any ListRenderer
+                return ($(this).parentsUntil($root, "[data-iterate], [data-each]").length == 0);
+            };
+
+
+		// bind the first level ListRenderer
+		if (Renderer.isListRenderer($root)) {
+			return $root;
+
+		} else {
+			return $root.filter(isRenderer)
+                .add( // simple bound elements
+                    $("*[data-bind], *[data-render-if]", $root)
+                        .filter(firstLevel)
+                )
+                .add( // iterators
+                    $("*[data-iterate], *[data-each]", $root)
+                        .filter(firstLevel)
+                );
+		}
+	}
+
+	// FACTORIES
+
 	// Bindings factory
 	var Bindings = {
-
-		/**
-		 * Build a parametrized function(data) that will hide or show the element according to the boolean value
-		 * of <condition> in <data>
-		 * @param $elt
-		 * @param condition
-		 * @return {Function} a function bound to the element to update
-		 */
-		toggler: function ($elt, condition) {
-
-			return function(data) {
-				$elt.toggle(evalProperty(data, condition));
-			};
-		},
 
 		/**
 		 * Build a parametrized function(data) that updates an element attributes or inner content
@@ -71,237 +305,110 @@
 		 * @param expr : [text|html|value|<attribute_name>]=<path.to.data>
 		 * Examples :
 		 * - "author.name"
-		 * - "class=article.type"
+		 * - "class[article|quote]=article.type"
 		 * - "href=article.source"
 		 * @param condition <path.to.data>
 		 * @return {Function} a function bound to the element to update
 		 */
-		updater: function ($elt, expr, condition) {
+		updater: function ($elt, expr) {
 
 			console.log("Binding '" + expr + "' for element " + displayNode($elt));
 
-			var binding, exprParts = expr.split("=");
+			var exprParts = expr.split("=");
 
 			if (exprParts.length == 1) { // the target property or attribute is not specified
 				var path = exprParts[0],
 					tagName = $elt[0].tagName.toLowerCase(); // normalize the name of the tag ('div', 'input', 'select', etc..)
 
 				if ("input|select".indexOf(tagName) != -1) {
-					binding = function (data) {
-						$elt.val(evalProperty(data, path, $elt));
+					return function (data) {
+						$elt.val(evalProperty(path, data, $elt));
 					};
 				} else {
-					binding = function (data) {
-						$elt.html(evalProperty(data, path, $elt));
+					return function (data) {
+						$elt.html(evalProperty(path, data, $elt));
 					};
 				}
 
 			} else {
 				var attr = exprParts[0].toLowerCase(), path = exprParts[1];
 
-				if (attr == "class") {
-					binding = function (data) {
-						$elt.addClass(evalProperty(data, path, $elt));
-					};
-				} else if ("text|html|value".indexOf(attr) != -1) {
-					binding = function (data) {
-						$elt[attr](evalProperty(data, path, $elt));
-					};
-				} else {
-					binding = function (data) {
-						$elt.attr(attr, evalProperty(data, path, $elt));
-					};
-				}
-			}
-
-			if (condition) { // wrap the binding with a conditional rendering
-				return function(data) {
-					if (evalProperty(data, condition))  {
-						binding(data);
-						$elt.show();
+				if (attr.indexOf("class") == 0) {
+					// find an enumeration of classes : class[a|b|c]
+					var classes = /\[([\w|\|]+)\]/g.exec(attr);
+					if (classes) {
+						classes = classes[1].split("|").join(" ");
+						return function (data) {
+							$elt.removeClass(classes);
+							$elt.addClass(evalProperty(path, data, $elt));
+						};
 					} else {
-						$elt.hide();
+						return function (data) {
+							$elt.attr("class", evalProperty(path, data, $elt));
+						};
 					}
-				}
-			}
-			return binding;
-		}
-
-	};
-
-
-	/**
-	 * A Renderer is the live instance of a static template
-	 * It is a DOM representation of the template
-	 * with a bounded list of nodes ready to be updated
-	 * @param content
-	 * @constructor
-	 */
-	function Renderer(content) {
-		if (!content) return; // allow empty new Renderer() to be used as prototype for Iterator()
-
-		this.$root = $(content);
-		Renderer.bindContent.call(this, this.$root);
-	}
-	Renderer.prototype = {
-		render:function (data) {
-			for (var i = 0, bindings = this.bindings, render; render = bindings[i++];) {
-				render(data);
-			}
-			return this.$root;
-		},
-		output:function (data) {
-			this.render(data).html();
-		},
-		toHtml:function () {
-			return this.$root.html();
-		},
-		destroy:function () {
-			this.bindings = this.$root = null;
-		}
-	};
-
-	/**
-	 * A specific type of Renderer that iterates a sub template over values of a collection
-	 * @param $elt
-	 * @constructor
-	 */
-	function Iterator($elt) {
-		this.$root = $elt;
-
-		// the first child block of an iterator is a special renderer used to loop on collection items
-		this.template = new Renderer($elt.children().first());
-		// parse the loop expression
-		Iterator.extractLoop(Iterator.loopExpression($elt), this);
-	}
-	Iterator.prototype = new Renderer();
-
-	/**
-	 * Override the render method with a loop on the collection
-	 * @param data
-	 */
-	Iterator.prototype.render = function (data) {
-		var collection = evalProperty(data, this.seed),
-			key = this.varName;
-
-		this.$root.empty(); // clear all
-
-		// Add loop variable to data
-		for (var i = 0, item; item = collection[i++];) {
-			data[key] = item;
-			this.$root.append(this.template.render(data).clone()); // render the line template and add it to the root
-		}
-		delete data[key];
-	};
-
-	/**
-	 * Iterator utils
-	 * the loop expression in 'data-iterate' or 'data-each' has the following forms :
-	 * - "blog.articles"        	  // 'article' will automatically be derived as the variable to bind
-	 * - "child from family.children" // 'child' is explicitely designed to be the variable bound in the loop
-	 * - "tag : article.tags"         // ':' or 'from' are synonyms
-	 */
-	Renderer.isIterator = Iterator.loopExpression = function($elt) {
-		try {
-			return $elt.attr("data-iterate") || $elt.attr("data-each");
-		} catch (err) {
-			return ""; // needed when using jquip on window.document
-		}
-	};
-	Iterator.extractLoop = function(loopExpr, dest) {
-		var expr  = loopExpr.replace("from", ":"),
-			parts = expr.split(":"),
-			collectionPath = parts[1] || parts[0];
-
-		dest.seed = collectionPath.trim();
-
-		if (parts.length == 2) { // <varName> : <path.to.collection>
-			dest.varName = parts[0].trim();
-
-		} else { // extract the variable name from the last membe of the collection path
-			dest.varName = dest.seed.split(".").pop();  // the last part of the path
-			dest.varName = dest.varName.replace(/s*$/, ""); // remove trailing s
-		}
-	}
-
-	/**
-	 * The main plat de résistance:
-	 * Parse a root element and its content to retrieve the bind expressions : data-bind and data-iterate
-	 * Then store them in a collection of rendering methods ready to be called on the data to render
-	 * @param $root
-	 */
-	Renderer.bindContent = function ($root) {
-
-		var bindings = this.bindings = [], // live expressions
-			firstLevel = function () { // filter first level elements (not contained in an iterator)
-				return ($(this).parentsUntil($root, "[data-iterate], [data-each]").length == 0);
-			},
-			bindIterator = function (i, elt) {
-				var $elt = $(elt), iterator = new Iterator($elt);
-
-				bindings.push(function (data) {
-					iterator.render(data);
-				});
-
-				$elt.removeAttr("data-iterate data-each");
-			},
-			bind = function (i, elt) {
-
-				var $elt = $(elt),
-					renderCondition = $elt.attr("data-render-if"),
-					bindExpression  = $elt.attr("data-bind");
-
-				if (renderCondition && !bindExpression) {
-					// this element has only a data-render-if attribute
-					bindings.push(Bindings.toggler($elt, renderCondition));
-
+				} else if ("text|html|value".indexOf(attr) != -1) {
+					return function (data) {
+						$elt[attr](evalProperty(path, data, $elt));
+					};
 				} else {
-					// each bind expression is separated by a comma ',' eventually preceded of followed by spaces
-					var boundList = (bindExpression || "").split(/\s*,\s*/);
-					for (var i = 0, expr; expr = boundList[i++];) {
-						bindings.push(Bindings.updater($elt, expr, renderCondition));
-					}
+					return function (data) {
+						$elt.attr(attr, evalProperty(path, data, $elt));
+					};
 				}
+			}
+		}
+	};
 
-				$elt.removeAttr("data-bind data-render-if");
-			};
+	Renderer.Factory = function($elt) {
+		var dataBind  = $elt.attr("data-bind"),
+			condition = $elt.attr("data-render-if"),
+			loopExpr  = $elt.attr("data-iterate") || $elt.attr("data-each");
 
-		// bind the first level iterator
-		if (Renderer.isIterator($root)) {
-			$root.each(bindIterator).each(bind);
+        $elt.removeAttr("data-bind data-render-if data-iterate data-each");
+
+		if (loopExpr) {
+			return new ListRenderer($elt, loopExpr, condition, dataBind); 
+
+		} else if (condition) {
+			return new ConditionalElementRenderer($elt, condition, dataBind); 
+
+		} else if (dataBind.indexOf(",") > 0) {
+			return new SimpleElementRenderer($elt, dataBind); 
 
 		} else {
-			$("*[data-bind], *[data-render-if]", $root).filter(firstLevel).add($root).each(bind);
-			$("*[data-iterate], *[data-each]", $root).filter(firstLevel).each(bindIterator);
+			return new AttributeRenderer($elt, dataBind); 
 		}
-	}
+	};
 
+
+	// PUBLIC API
 
 	/**
 	 * Temples facade object
 	 */
 	var Temples = {
-		Renderer:Renderer,
-		prepare:function (name, template) {
+		Renderer: TemplateRenderer,
+		prepare: function (name, template) {
 			if (!template) {
 				// load template content from name
 				if (name.indexOf("#") == 0) { // a DOM element ID
 					template = $(name);
-				}
+				} else if (name == "document") { // a DOM element ID
+                    template = $("html");
+                }
 			}
-			return (templates[name] = new Renderer(template));
+			return (templates[name] = new Temples.Renderer(template));
 		},
 		destroy:function (name) {
 			if (templates[name]) templates[name].destroy();
 			delete templates[name];
 		},
 		render:function (name, data) {
-			var dom;
 			if (!data && typeof name == "object") {
-				data = name;
-				dom = Temples.prepare(name = "window.document", $("html"));
+				data = name; name = "document";
 			}
-			(dom || templates[name] || Temples.prepare(name)).render(data);
+			(templates[name] || Temples.prepare(name)).render(data);
 		}
 	};
 	Temples.register = Temples.prepare;
@@ -312,4 +419,4 @@
 		context.exports = Temples;
 	}
 
-})(this, this.jQuery || this.ender || this.jquip || require("./lib/jquery4node"));
+})(this, jQuery || ender || jquip || require("./lib/jquery4node"));
