@@ -1,0 +1,27 @@
+CHANGELOG
+----------------------
+
+
+v0.1.1
+[2012-10-25]
+ * Added ChangeLog
+ * Preparing to tag v0.1.1 before full rewriting
+
+[2012-10-23]
+ * corrected main location
+ * Temples.render(data) will automatically register the whole document as template and render the full page with the provided data
+ * First build of the minified version
+ * strange shorter syntax improvement : $root.each(bindIterator).each(bind);
+
+[2012-10-22]
+ * Code reorganization + lots of comments
+ * Remove the binding attributes once the binding is done. Results in cleaner output.
+ * Fix : create a special kind of binding for elements that have only the render-data-if attribute
+ * Renderer.parse() : Add the root element itself to the parsed elements set
+ * Added conditional-rendering and data-each as a synonym to data-iterate
+ * Iteration block alternate syntax
+
+[2012-10-20]
+ * fixed : $().val() instead of $().value(), String.prototype.startsWith() not present.
+ * extractData() can now invoke methods on the provided objects. Useful for the plugins extension mechanism.
+ * First commit
