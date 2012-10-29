@@ -1,6 +1,12 @@
 CHANGELOG
 ----------------------
 
+v0.2.0
+[2012-10-25]
+ * Full code refactoring.
+ * [Added]: New syntax for class attribute : data-bind="class[val1|val2]=path.to.data"
+ * [Fixed]: 'data-render-if' now works with 'data-each'
+
 
 v0.1.1
 [2012-10-25]
