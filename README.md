@@ -112,7 +112,7 @@ is equivalent to :
 
 ### Binding the `class` attribute
 
-There is a special syntax for the `class` attribute, because its a list of values, and usually, you need more control to change it.
+There is a special syntax for the `class` attribute allowing you to specify the values you want to alter.
 Because the `class` attribute is a space separated list of values, you usually want to toggle certain values/state within a particular range, leaving the others untouched.
 This is exactly what you can do with the extended `data-bind` syntax for the class attribute :
 
@@ -120,7 +120,7 @@ This is exactly what you can do with the extended `data-bind` syntax for the cla
 <div class="row container" data-bind="class[article|quote|tweet]=article.type" />
 ```
 
-In this example, the binding value of `article.type` will be evaluated, and used to replace all of this values within the class attribute : 'article', 'quote' or 'tweet'. All other classes values (ie : 'row' and 'container' in or exaple) will be left untouched.
+In this example, the binding value of `article.type` will be evaluated, and used to replace all of this values within the class attribute : 'article', 'quote' or 'tweet'. All other classes values (ie : 'row' and 'container' in our example) will be left untouched.
 
 
 
