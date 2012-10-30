@@ -419,4 +419,4 @@
 		context.exports = Temples;
 	}
 
-})(this, jQuery || ender || jquip || require("./lib/jquery4node"));
+})(this, window.jQuery || window.ender || window.jquip || require("./lib/jquery4node"));
