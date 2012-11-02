@@ -61,22 +61,36 @@
 		 * Cause all the bindings to render their elements with the provided data
 		 */
 		render:function (data) {
-            var bindings = this.bindings,
-                l = bindings.length;
+			var bindings = this.bindings,
+			    l = bindings.length;
 			for (var i = 0; i < l; i++) {
 				bindings[i](data);
 			}
 			return this.$root;
 		},
 		/**
-		 * Render the data and output the flat HTML
+		 * Render the data and output the DOM to flat HTML
 		 * @return {String} 
 		 */
 		output:function (data) {
-			return this.render(data).html();
+			this.render(data);
+			var output = [];
+			try {
+				this.$root.each(function(i, elt) {
+					output.push(elt.outerHTML);
+				})
+			} catch (e) { // no outerHTML support ?
+				if (XMLSerializer) {
+					var serializer = new XMLSerializer();
+					this.$root.each(function(i, elt) {
+						output.push(serializer.serializeToString(elt));
+					})
+				}
+			}
+			return output.join("");
 		},
 		/**
-		 * Exports the current HTML rendering
+		 * Exports the current inner HTML rendering
 		 * @return {String} 
 		 */
 		toHtml:function () {
@@ -98,26 +112,26 @@
 
 	}
 	AttributeRenderer.prototype = new Renderer();
-    AttributeRenderer.prototype.toString = function() {
-        return "AttributeRenderer(" + displayNode(this.$root) + ")";
-    };
+	AttributeRenderer.prototype.toString = function() {
+		return "AttributeRenderer(" + displayNode(this.$root) + ")";
+	};
 
 	/**
 	 * Deals with multiple attributes bindings
 	 * on a single element
-	 * @param dataBindExpr a comma separated list of binding expressions
+	 * @param {String} dataBindExpr a comma separated list of binding expressions
 	 */
 	function SimpleElementRenderer($elt, dataBind) {
 		this.$root = $elt;
 		var bindings = this.bindings = [],
-            expr, exprList = dataBind.split(",");
+		    expr, exprList = dataBind.split(",");
 		while (expr = exprList.pop())
 			bindings.push(Bindings.updater($elt, expr.trim()));
 	}
 	SimpleElementRenderer.prototype = new Renderer();
-    SimpleElementRenderer.prototype.toString = function() {
-        return "SimpleElementRenderer(" + displayNode(this.$root) + ")";
-    };
+	SimpleElementRenderer.prototype.toString = function() {
+		return "SimpleElementRenderer(" + displayNode(this.$root) + ")";
+	};
 
 	/**
 	 * Deals with multiple attributes bindings
@@ -125,32 +139,33 @@
 	 * @param dataBindExpr a comma separated list of binding expressions
 	 */
 	function ConditionalElementRenderer($elt, cond, dataBind) {
-        if (!arguments.length) return; // to use as empty prototype
+		if (!arguments.length) return; // to use as empty prototype
 
 		this.$root = $elt;
 		this.condition = cond;
 		var conditionalbindings = this.conditionalbindings = [];
 
-        if (dataBind) {
-            var exprList = dataBind.split(",");
-            for (var i = 0, expr; expr = exprList[i++];) {
-                conditionalbindings.push(Bindings.updater($elt, expr.trim()));
-            }
-        }
+		if (dataBind) {
+			var exprList = dataBind.split(",");
+			for (var i = 0, expr; expr = exprList[i++];) {
+				conditionalbindings.push(Bindings.updater($elt, expr.trim()));
+			}
+		}
 
-        var self = this; // bindings methods must allways be created within a closure so that they do not depend on the 'this' keyword
-        this.bindings = [function(data) {
-            if (evalProperty(cond, data)) {
-                for (var i = 0, render; render = conditionalbindings[i++];) {
-                    render(data);
-                }
+		var self = this; // bindings methods must allways be created within a closure so that they do not depend on the 'this' keyword
+		this.bindings = [function(data) {
 
-                self.reappear();
-            } else {
-                // replace our element with a vibrant placeholder
-                self.disappear("Temples says: " + cond + "=false");
-            }
-        }];
+			if (evalProperty(cond, data)) {
+				for (var i = 0, render; render = conditionalbindings[i++];) {
+					render(data);
+				}
+				self.reappear();
+
+			} else {
+				// replace our element with a vibrant placeholder
+				self.disappear("Temples says: " + cond + "=false");
+			}
+		}];
 	}
 	$.extend(
 		ConditionalElementRenderer.prototype = new Renderer(),
@@ -170,9 +185,9 @@
 			}
 		}
 	); // ConditionalElementRenderer.prototype
-    ConditionalElementRenderer.prototype.toString = function() {
-        return "ConditionalElementRenderer(" + displayNode(this.$root) + " if " + this.condition + ")";
-    };
+	ConditionalElementRenderer.prototype.toString = function() {
+		return "ConditionalElementRenderer(" + displayNode(this.$root) + " if " + this.condition + ")";
+	};
 
 
 	/**
@@ -185,20 +200,20 @@
 	 * - "blog.articles"        	  // 'article' will automatically be derived as the variable to bind
 	 * - "child from family.children" // 'child' is explicitely designed to be the variable bound in the loop
 	 * - "tag : article.tags"         // ':' or 'from' are synonyms
-     * @param cond {optional}
-     * @param dataBind {optional}
+	 * @param cond {optional}
+	 * @param dataBind {optional}
 	 * @constructor
 	 */
 	function ListRenderer($elt, loopExpr, cond, dataBind) {
 
-        this.$root = $elt;
-        // the first child block of an ListRenderer is the template used to loop on collection items
-        var template = this.template = new TemplateRenderer($elt.children().first());
+		this.$root = $elt;
+		// the first child block of an ListRenderer is the template used to loop on collection items
+		var template = this.template = new TemplateRenderer($elt.children().first());
 
 		// Parse the loop expression
 		var expr  = loopExpr.replace("from", ":"), // from and ':' are equivalents
-			parts = expr.split(":"),
-			collectionPath = parts[1] || parts[0];
+		    parts = expr.split(":"),
+		    collectionPath = parts[1] || parts[0];
 
 		// the seed is the name of the collection to iterate on
 		var seed = this.seed = collectionPath.trim();
@@ -212,29 +227,29 @@
 			this.varName = this.varName.replace(/s*$/, ""); // remove trailing s
 		}
 
-        // Define the bindings
-        var varName = this.varName;
+		// Define the bindings
+		var varName = this.varName;
 
-        ConditionalElementRenderer.call(this, $elt, cond, dataBind);
+		ConditionalElementRenderer.call(this, $elt, cond, dataBind);
 
-        // render the line template if the condition is passed
-        this.conditionalbindings.push(function(data) {
-            var collection = evalProperty(seed, data);
+		// render the line template if the condition is passed
+		this.conditionalbindings.push(function(data) {
+			var collection = evalProperty(seed, data);
 
-            $elt.empty();
-            for (var i = 0, l = collection.length; i < l; i++) {
-                // Add the item's value to the data object
-                data[varName] = collection[i];
-                $elt.append(template.render(data).clone()); // render the line template and add it to the root
-            }
-            delete data[varName];
+			$elt.empty();
+			for (var i = 0, l = collection.length; i < l; i++) {
+				// Add the item's value to the data object
+				data[varName] = collection[i];
+				$elt.append(template.render(data).clone()); // render the line template and add it to the root
+			}
+			delete data[varName];
 
-        });
-    }
+		});
+	}
 	ListRenderer.prototype = new ConditionalElementRenderer();
-    ListRenderer.prototype.toString = function() {
-        return "ListRenderer(" + displayNode(this.$root) + ")";
-    };
+	ListRenderer.prototype.toString = function() {
+		return "ListRenderer(" + displayNode(this.$root) + ")";
+	};
 
 
 	/**
@@ -256,23 +271,23 @@
 			var $targets = Renderer.targets($(elt));
 			$targets.each(function(i, elt) {
 				var renderer = Renderer.Factory($(elt));
-				Array.prototype.push.apply(bindings, renderer.bindings);
-            });
+				if (renderer) Array.prototype.push.apply(bindings, renderer.bindings);
+			});
 		});
 	}
-    TemplateRenderer.prototype = new Renderer();
-    TemplateRenderer.prototype.toString = function() {
-        return "TemplateRenderer(" + displayNode(this.$root) + ")";
-    };
+	TemplateRenderer.prototype = new Renderer();
+	TemplateRenderer.prototype.toString = function() {
+		return "TemplateRenderer(" + displayNode(this.$root) + ")";
+	};
 
 	Renderer.targets = function($root) {
 
 		// find all data-bound child from this root element
 		var isRenderer = function() {
-                return ($(this).attr("data-bind") || $(this).attr("data-render-if"));
-            }, firstLevel = function () { // filter elements not contained in any ListRenderer
-                return ($(this).parentsUntil($root, "[data-iterate], [data-each]").length == 0);
-            };
+				return ($(this).attr("data-bind") || $(this).attr("data-render-if"));
+			}, firstLevel = function () { // filter elements not contained in any ListRenderer
+				return ($(this).parentsUntil($root, "[data-iterate], [data-each]").length == 0);
+			};
 
 
 		// bind the first level ListRenderer
@@ -281,14 +296,14 @@
 
 		} else {
 			return $root.filter(isRenderer)
-                .add( // simple bound elements
-                    $("*[data-bind], *[data-render-if]", $root)
-                        .filter(firstLevel)
-                )
-                .add( // iterators
-                    $("*[data-iterate], *[data-each]", $root)
-                        .filter(firstLevel)
-                );
+				.add( // simple bound elements
+					$("*[data-bind], *[data-render-if]", $root)
+						.filter(firstLevel)
+				)
+				.add( // iterators
+					$("*[data-iterate], *[data-each]", $root)
+						.filter(firstLevel)
+				);
 		}
 	}
 
@@ -362,10 +377,10 @@
 
 	Renderer.Factory = function($elt) {
 		var dataBind  = $elt.attr("data-bind"),
-			condition = $elt.attr("data-render-if"),
-			loopExpr  = $elt.attr("data-iterate") || $elt.attr("data-each");
+		    condition = $elt.attr("data-render-if"),
+		    loopExpr  = $elt.attr("data-iterate") || $elt.attr("data-each");
 
-        $elt.removeAttr("data-bind data-render-if data-iterate data-each");
+		$elt.removeAttr("data-bind data-render-if data-iterate data-each");
 
 		if (loopExpr) {
 			return new ListRenderer($elt, loopExpr, condition, dataBind); 
@@ -373,10 +388,10 @@
 		} else if (condition) {
 			return new ConditionalElementRenderer($elt, condition, dataBind); 
 
-		} else if (dataBind.indexOf(",") > 0) {
+		} else if (dataBind && dataBind.indexOf(",") > 0) {
 			return new SimpleElementRenderer($elt, dataBind); 
 
-		} else {
+		} else if (dataBind) {
 			return new AttributeRenderer($elt, dataBind); 
 		}
 	};
@@ -394,11 +409,13 @@
 				// load template content from name
 				if (name.indexOf("#") == 0) { // a DOM element ID
 					template = $(name);
-				} else if (name == "document") { // a DOM element ID
-                    template = $("html");
-                }
+				} else if (name == "document") {
+					template = $("html");
+				}
+			} else if ($.fetch) {
+				$.fetch(template);
 			}
-			return (templates[name] = new Temples.Renderer(template));
+			return (templates[name] = new Temples.Renderer($(template)));
 		},
 		destroy:function (name) {
 			if (templates[name]) templates[name].destroy();
@@ -416,7 +433,7 @@
 	if (context === window) { // browser context
 		context["Temples"] = Temples; // exports Temples under its name in the global space
 	} else {
-		context.exports = Temples;
+		module.exports = Temples;
 	}
 
-})(this, window.jQuery || window.ender || window.jquip || require("./lib/jquery4node"));
+})(this, this.jQuery || this.ender || this.jquip || require("buck"));
