@@ -24,12 +24,15 @@
 	 */
 	function displayNode($elt) {
 		var tagName = $elt.prop("tagName").toLowerCase(),
-			id = $elt.attr("id"), className = $elt.attr("class");
+		    id = $elt.attr("id"), className = $elt.attr("class");
 		return tagName + (id ? "#" + id : "") + (className ? "." + className : "");
 	}
 
-	function comment(whattosay) {
-		return $("<!--" + whattosay + "-->");
+	/**
+	 * A placeholder for absent rendering elements
+	 */
+	function comment(cm) {
+		return $("<!--" + cm + "-->");
 	}
 
 	/**
@@ -41,7 +44,7 @@
 	 */
 	function evalProperty(path, data, $elt) {
 		var key, parent, found = data,
-			steps = (path || "").trim().split(".");
+		    steps = (path || "").trim().split(".");
 		while (found && (key = steps.shift())) {
 			parent = found;
 			found = found[key];
@@ -208,7 +211,7 @@
 
 		this.$root = $elt;
 		// the first child block of an ListRenderer is the template used to loop on collection items
-		var template = this.template = new TemplateRenderer($elt.children().first());
+		var template = this.template = new TemplateRenderer(this.toString(), $elt.children().first());
 
 		// Parse the loop expression
 		var expr  = loopExpr.replace("from", ":"), // from and ':' are equivalents
@@ -263,7 +266,8 @@
 		}
 	};
 
-	function TemplateRenderer($elements) {
+	function TemplateRenderer(name, $elements) {
+		this.name = name;
 		this.$root = $elements;
 		var bindings = this.bindings = [];
 
@@ -277,7 +281,7 @@
 	}
 	TemplateRenderer.prototype = new Renderer();
 	TemplateRenderer.prototype.toString = function() {
-		return "TemplateRenderer(" + displayNode(this.$root) + ")";
+		return "TemplateRenderer(" + name + ", " + displayNode(this.$root) + ")";
 	};
 
 	Renderer.targets = function($root) {
@@ -415,7 +419,7 @@
 			} else if ($.fetch) {
 				$.fetch(template);
 			}
-			return (templates[name] = new Temples.Renderer($(template)));
+			return (templates[name] = new Temples.Renderer(name, $(template)));
 		},
 		destroy:function (name) {
 			if (templates[name]) templates[name].destroy();
