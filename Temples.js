@@ -30,9 +30,10 @@
 	 * @param $elt
 	 * @return {String}
 	 */
-	function displayNode($elt) {
-		var tagName = $elt.prop("tagName").toLowerCase(),
-		    id = $elt.attr("id"), className = $elt.attr("class");
+	function displayNode(elt) {
+		if (!elt) return "undefined";
+		var tagName = elt.tagName,
+		    id = elt.id, className = elt.className;
 		return tagName + (id ? "#" + id : "") + (className ? "." + className : "");
 	}
 
@@ -109,7 +110,7 @@
 		},
 		destroy:function () {
 			this.bindings = this.$root = null;
-			delete this.render;
+			if (this.name) delete Temples[this.name];
 		},
 
 		toString: function(s) { // memoize the String representation of this renderer
@@ -126,7 +127,7 @@
 		this.$root = $elt;
 		this.bindings = [Bindings.updater($elt, expr)];
 
-		this.toString("AttributeRenderer(" + displayNode(this.$root) + "[" + expr + "])");
+		this.toString("AttributeRenderer(" + displayNode($elt[0]) + "[" + expr + "])");
 	}
 	AttributeRenderer.prototype = new Renderer();
 
@@ -137,7 +138,7 @@
 	 */
 	function SimpleElementRenderer($elt, dataBind) {
 		this.$root = $elt;
-		this.toString("SimpleElementRenderer(" + displayNode(this.$root) + "[" + dataBind + "])");
+		this.toString("SimpleElementRenderer(" + displayNode($elt[0]) + "[" + dataBind + "])");
 
 		var bindings = this.bindings = [],
 		    expr, exprList = dataBind.split(",");
@@ -158,7 +159,7 @@
 		this.condition = cond;
 		var conditionalbindings = this.conditionalbindings = [];
 
-		this.toString("ConditionalElementRenderer(" + displayNode(this.$root) + "[" + dataBind + "] if " + cond + ")");
+		this.toString("ConditionalElementRenderer(" + displayNode($elt[0]) + "[" + dataBind + "] if " + cond + ")");
 
 		if (dataBind) {
 			var exprList = dataBind.split(",");
@@ -220,10 +221,12 @@
 
 		this.$root = $elt;
 		// the first child block of a ListRenderer is the template used to loop on collection items
-		var template = this.template = new TemplateRenderer(this.toString(), $elt.children().first());
+		var renderBlock = $elt.children().first();
+		if (!renderBlock.length) throw "List Renderer " + displayNode($elt[0]) + " for (" + loopExpr + ") must have at least a child block!";
+		var template = this.template = new TemplateRenderer(this.toString(), renderBlock);
 
-		this.toString("ListRenderer(" + displayNode(this.$root) + "[" + dataBind + "] if " + cond + ")\n"
-			+ "iterate " + loop + " with " + template);
+		this.toString("ListRenderer(" + displayNode($elt[0]) + "[" + dataBind + "] if " + cond + ")\n"
+			+ "iterate " + loopExpr + " with " + template);
 
 		// Parse the loop expression
 		var expr  = loopExpr.replace("from", ":"), // from and ':' are equivalents
@@ -274,15 +277,15 @@
 		}
 	};
 
-	function TemplateRenderer(name, $elements) {
+	function TemplateRenderer(name, $elts) {
 		this.name = name;
-		this.$root = $elements;
+		this.$root = $elts;
 
-		this.toString("TemplateRenderer(" + this.name + ", " + displayNode(this.$root) + ")");
+		this.toString("TemplateRenderer(" + this.name + ", " + displayNode($elts[0]) + ")");
 
 		var bindings = this.bindings = [];
 
-		$elements.each(function(i, elt) {
+		$elts.each(function(i, elt) {
 			var $targets = Renderer.targets($(elt));
 			$targets.each(function(i, elt) {
 				var renderer = Renderer.Factory($(elt));
@@ -339,7 +342,7 @@
 		 */
 		updater: function ($elt, expr) {
 
-			console.log("Binding '" + expr + "' for element " + displayNode($elt));
+			console.log("Binding '" + expr + "' for element " + displayNode($elt[0]));
 
 			var exprParts = expr.split("=");
 
