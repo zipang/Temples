@@ -17,6 +17,14 @@
 	// shims
 	if (!console) window.console = {log: function() {}};
 
+	var stringProto = String.prototype;
+	stringProto.startsWith = stringProto.startsWith || function(str) {
+		return (this.indexOf(str) === 0);
+	};
+	stringProto.contains = stringProto.contains || function(str) {
+		return (this.indexOf(str) !== -1);
+	};
+
 	/**
 	 * returns a convenient string representation for a DOM element
 	 * @param $elt
@@ -101,6 +109,11 @@
 		},
 		destroy:function () {
 			this.bindings = this.$root = null;
+			delete this.render;
+		},
+
+		toString: function(s) { // memoize the String representation of this renderer
+			if (s) this.toString = function() {return s;}; else return "Renderer";
 		}
 	};
 
@@ -113,11 +126,9 @@
 		this.$root = $elt;
 		this.bindings = [Bindings.updater($elt, expr)];
 
+		this.toString("AttributeRenderer(" + displayNode(this.$root) + "[" + expr + "])");
 	}
 	AttributeRenderer.prototype = new Renderer();
-	AttributeRenderer.prototype.toString = function() {
-		return "AttributeRenderer(" + displayNode(this.$root) + ")";
-	};
 
 	/**
 	 * Deals with multiple attributes bindings
@@ -126,15 +137,14 @@
 	 */
 	function SimpleElementRenderer($elt, dataBind) {
 		this.$root = $elt;
+		this.toString("SimpleElementRenderer(" + displayNode(this.$root) + "[" + dataBind + "])");
+
 		var bindings = this.bindings = [],
 		    expr, exprList = dataBind.split(",");
 		while (expr = exprList.pop())
 			bindings.push(Bindings.updater($elt, expr.trim()));
 	}
 	SimpleElementRenderer.prototype = new Renderer();
-	SimpleElementRenderer.prototype.toString = function() {
-		return "SimpleElementRenderer(" + displayNode(this.$root) + ")";
-	};
 
 	/**
 	 * Deals with multiple attributes bindings
@@ -147,6 +157,8 @@
 		this.$root = $elt;
 		this.condition = cond;
 		var conditionalbindings = this.conditionalbindings = [];
+
+		this.toString("ConditionalElementRenderer(" + displayNode(this.$root) + "[" + dataBind + "] if " + cond + ")");
 
 		if (dataBind) {
 			var exprList = dataBind.split(",");
@@ -188,9 +200,6 @@
 			}
 		}
 	); // ConditionalElementRenderer.prototype
-	ConditionalElementRenderer.prototype.toString = function() {
-		return "ConditionalElementRenderer(" + displayNode(this.$root) + " if " + this.condition + ")";
-	};
 
 
 	/**
@@ -210,8 +219,11 @@
 	function ListRenderer($elt, loopExpr, cond, dataBind) {
 
 		this.$root = $elt;
-		// the first child block of an ListRenderer is the template used to loop on collection items
+		// the first child block of a ListRenderer is the template used to loop on collection items
 		var template = this.template = new TemplateRenderer(this.toString(), $elt.children().first());
+
+		this.toString("ListRenderer(" + displayNode(this.$root) + "[" + dataBind + "] if " + cond + ")\n"
+			+ "iterate " + loop + " with " + template);
 
 		// Parse the loop expression
 		var expr  = loopExpr.replace("from", ":"), // from and ':' are equivalents
@@ -250,10 +262,6 @@
 		});
 	}
 	ListRenderer.prototype = new ConditionalElementRenderer();
-	ListRenderer.prototype.toString = function() {
-		return "ListRenderer(" + displayNode(this.$root) + ")";
-	};
-
 
 	/**
 	 * Renderer utils
@@ -269,6 +277,9 @@
 	function TemplateRenderer(name, $elements) {
 		this.name = name;
 		this.$root = $elements;
+
+		this.toString("TemplateRenderer(" + this.name + ", " + displayNode(this.$root) + ")");
+
 		var bindings = this.bindings = [];
 
 		$elements.each(function(i, elt) {
@@ -280,9 +291,6 @@
 		});
 	}
 	TemplateRenderer.prototype = new Renderer();
-	TemplateRenderer.prototype.toString = function() {
-		return "TemplateRenderer(" + name + ", " + displayNode(this.$root) + ")";
-	};
 
 	Renderer.targets = function($root) {
 
@@ -339,7 +347,7 @@
 				var path = exprParts[0],
 					tagName = $elt[0].tagName.toLowerCase(); // normalize the name of the tag ('div', 'input', 'select', etc..)
 
-				if ("input|select".indexOf(tagName) != -1) {
+				if ("input|select".contains(tagName)) {
 					return function (data) {
 						$elt.val(evalProperty(path, data, $elt));
 					};
@@ -352,7 +360,7 @@
 			} else {
 				var attr = exprParts[0].toLowerCase(), path = exprParts[1];
 
-				if (attr.indexOf("class") == 0) {
+				if (attr.startsWith("class")) {
 					// find an enumeration of classes : class[a|b|c]
 					var classes = /\[([\w|\|]+)\]/g.exec(attr);
 					if (classes) {
@@ -366,7 +374,7 @@
 							$elt.attr("class", evalProperty(path, data, $elt));
 						};
 					}
-				} else if ("text|html|value".indexOf(attr) != -1) {
+				} else if ("text|html|value".contains(attr)) {
 					return function (data) {
 						$elt[attr](evalProperty(path, data, $elt));
 					};
@@ -392,7 +400,7 @@
 		} else if (condition) {
 			return new ConditionalElementRenderer($elt, condition, dataBind); 
 
-		} else if (dataBind && dataBind.indexOf(",") > 0) {
+		} else if (dataBind && dataBind.contains(",")) {
 			return new SimpleElementRenderer($elt, dataBind); 
 
 		} else if (dataBind) {
@@ -411,25 +419,29 @@
 		prepare: function (name, template) {
 			if (!template) {
 				// load template content from name
-				if (name.indexOf("#") == 0) { // a DOM element ID
+				if (name.startsWith("#")) { // a DOM element ID
 					template = $(name);
 				} else if (name == "document") {
 					template = $("html");
+				} else if (name.startsWith("<") || name.contains(" ")) {
+					// that's the template! no mame was passed
+					template = name;
+					name = undefined;
 				}
 			} else if ($.fetch) {
 				$.fetch(template);
 			}
-			return (templates[name] = new Temples.Renderer(name, $(template)));
+			return (Temples[name] = templates[name] = new Temples.Renderer(name, $(template)));
 		},
 		destroy:function (name) {
-			if (templates[name]) templates[name].destroy();
-			delete templates[name];
+			if (Temples[name]) Temples[name].destroy();
+			delete Temples[name];
 		},
 		render:function (name, data) {
 			if (!data && typeof name == "object") {
 				data = name; name = "document";
 			}
-			(templates[name] || Temples.prepare(name)).render(data);
+			(Temples[name] || Temples.prepare(name)).render(data);
 		}
 	};
 	Temples.register = Temples.prepare;
