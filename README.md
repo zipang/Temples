@@ -31,7 +31,7 @@ I want to :
 There are a few ways to use `Temples`.
 
 ##In the browser :
-Just include the `Temples.js` script after jQuery.
+Just include the `Temples.js` script after your favourite $ library (has been tested with jQuery and latest jquip so far).
 
 ```html
 <script src="http://code.jquery.com/jquery.js"></script>
@@ -47,9 +47,9 @@ var Temples = require("Temples");
 ```
 
 # Status, Tutorials, examples
+[![Build Status](https://secure.travis-ci.org/zipang/Temples.png)](http://travis-ci.org/zipang/Temples)
 
-`Temples` is currently in alpha.
-Test suite is coming soon.
+`Temples` is currently in pre-beta.
 Feel free to comment about the syntax, features..
 
 For the moment, you can have a play with the current pre-release version here :
