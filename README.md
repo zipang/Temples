@@ -31,12 +31,14 @@ I want to :
 There are a few ways to use `Temples`.
 
 ##In the browser :
-Just include the `Temples.js` script after your favourite $ library (has been tested with jQuery and latest jquip so far).
+Just include the `Temples.js` script after your favourite $ library (has been tested with jQuery and the _latest_ version of [jquip] so far).
 
 ```html
 <script src="http://code.jquery.com/jquery.js"></script>
 <script src="my/path/to/Temples.js"></script>
 ```
+
+[jquip]:https://github.com/mythz/jquip
 
 ##With node.js :
 Install the library using npm or add it to your `package.json` file as a dependancy,
