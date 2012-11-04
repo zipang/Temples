@@ -3,7 +3,7 @@
   "description": "HTML Templates that you won't hate",
   "author": "zipang",
   "organization": "Eidolon Labs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "main": "./Temples.js",
   "repository": "git://github.com/zipang/Temples.git",
   "homepage": "https://zipang.github.com/Temples",
