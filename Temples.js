@@ -10,7 +10,7 @@
 
 	if (!$) throw "Temples relies on a jQuery compatible DOM search engine and DOM manipulator";
 
-	var templates = {};
+	var templates = [];
 
 	// Utilities
 
@@ -110,7 +110,10 @@
 		},
 		destroy:function () {
 			this.bindings = this.$root = null;
-			if (this.name) delete Temples[this.name];
+			if (this.name) {
+				delete Temples[this.name];
+				templates.splice(templates.indexOf(this.name), 1);
+			}
 		},
 
 		toString: function(s) { // memoize the String representation of this renderer
@@ -278,10 +281,10 @@
 	};
 
 	function TemplateRenderer(name, $elts) {
-		this.name = name;
-		this.$root = $elts;
+		this.$root = $elts || name; // when passed only one argument, its $elts
+		if ($elts) this.name = name;
 
-		this.toString("TemplateRenderer(" + this.name + ", " + displayNode($elts[0]) + ")");
+		this.toString("TemplateRenderer(" + ($elts ? this.name + ", " : "") + displayNode($elts[0]) + ")");
 
 		var bindings = this.bindings = [];
 
@@ -434,11 +437,19 @@
 			} else if ($.fetch) {
 				$.fetch(template);
 			}
-			return (Temples[name] = templates[name] = new Temples.Renderer(name, $(template)));
+			if (name) {
+				templates.push(name);
+				return (Temples[name] = new Temples.Renderer(name, $(template)));
+			} else {
+				return new Temples.Renderer($(template));
+			}
 		},
 		destroy:function (name) {
-			if (Temples[name]) Temples[name].destroy();
-			delete Temples[name];
+			if (!name) {
+				templates.forEach(Temples.destroy);
+			} else if (Temples[name]) {
+				Temples[name].destroy();
+			}
 		},
 		render:function (name, data) {
 			if (!data && typeof name == "object") {
