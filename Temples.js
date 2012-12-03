@@ -434,8 +434,8 @@
 					template = name;
 					name = undefined;
 				}
-			} else if ($.fetch) {
-				$.fetch(template);
+			} else if ($.fetchDocument) {
+				$.fetchDocument(template);
 			}
 			if (name) {
 				templates.push(name);
@@ -460,10 +460,10 @@
 	};
 	Temples.register = Temples.prepare;
 
-	if (context === window) { // browser context
-		context["Temples"] = Temples; // exports Temples under its name in the global space
-	} else {
+	if (module && module.exports) {
 		module.exports = Temples;
+	} else {
+		context["Temples"] = Temples; // exports Temples under its name in the global space
 	}
 
 })(this, this.jQuery || this.ender || this.jquip || require("buck"));
