@@ -6,7 +6,7 @@
  * Date: 2012-10-29
  * v0.2.0
  */
-(function define(context, $) {
+(function define(JSContext, $) {
 
 	if (!$) throw "Temples relies on a jQuery compatible DOM search engine and DOM manipulator";
 
@@ -460,10 +460,11 @@
 	};
 	Temples.register = Temples.prepare;
 
-	if (module && module.exports) {
+	
+	if (JSContext.window) {
+		JSContext.window["Temples"] = Temples; // exports Temples under its name in the global space
+	} else if (module && module.exports) {
 		module.exports = Temples;
-	} else {
-		context["Temples"] = Temples; // exports Temples under its name in the global space
 	}
 
 })(this, this.jQuery || this.ender || this.jquip || require("buck"));
