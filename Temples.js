@@ -3,10 +3,10 @@
  * ============
  * Author: Eidolon Labs (zipang)
  * Source : http://github.com/zipang/Temples
- * Date: 2012-10-29
- * v0.2.0
+ * Date: 2013-11-25
+ * v0.2.1
  */
-(function define(JSContext, $) {
+(function (context, $) {
 
 	if (!$) throw "Temples relies on a jQuery compatible DOM search engine and DOM manipulator";
 
@@ -353,7 +353,7 @@
 				var path = exprParts[0],
 					tagName = $elt[0].tagName.toLowerCase(); // normalize the name of the tag ('div', 'input', 'select', etc..)
 
-				if ("input|select".contains(tagName)) {
+				if ((tagName == "input") || (tagName == "select")) {
 					return function (data) {
 						$elt.val(evalProperty(path, data, $elt));
 					};
@@ -460,9 +460,8 @@
 	};
 	Temples.register = Temples.prepare;
 
-	
-	if (JSContext.window) {
-		JSContext.window["Temples"] = Temples; // exports Temples under its name in the global space
+	if (context === window) { // browser context
+		context["Temples"] = Temples; // exports Temples under its name in the global space
 	} else if (module && module.exports) {
 		module.exports = Temples;
 	}

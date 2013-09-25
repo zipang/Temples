@@ -19,7 +19,7 @@
       //      + "<li data-bind='tag'>tic</li><li>tac</li>" + "</ul>",
       tags : $("<ul id='tags' data-each='article.tags'>")
            .append( $("<li>").append(tag) ),
-      resume : $("<div class='resume' data-render-if='article.resume' data-bind='article.resume' />"),
+      resume : $("<p class='resume' data-render-if='article.resume' data-bind='article.resume' />"),
       article : $("<div class='article row' data-bind='article.content,class[article|fiction|quote|tweet]=article.type' />")
     };
   }

@@ -1,6 +1,10 @@
 CHANGELOG
 ----------------------
 
+v0.2.1
+[2013-11-21]
+ * [Fixed]: some tags not rendering (<p>, <i>) (incorrect detection of input tags)
+
 v0.2.0
 [2012-10-29]
  * Full code refactoring.
