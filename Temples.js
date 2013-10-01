@@ -4,7 +4,7 @@
  * Author: Eidolon Labs (zipang)
  * Source : http://github.com/zipang/Temples
  * Date: 2013-11-25
- * v0.2.1
+ * v0.2.2
  */
 (function (context, $) {
 
@@ -430,19 +430,24 @@
 				} else if (name == "document") {
 					template = $("html");
 				} else if (name.startsWith("<") || name.contains(" ")) {
-					// that's the template! no mame was passed
+					// that's the template! no name was passed
 					template = name;
 					name = undefined;
 				}
 			} else if ($.fetchDocument) {
 				$.fetchDocument(template);
 			}
+
+			var $template = $(template), renderer;
 			if (name) {
 				templates.push(name);
-				return (Temples[name] = new Temples.Renderer(name, $(template)));
+				renderer = (Temples[name] = new Temples.Renderer(name, $template));
 			} else {
-				return new Temples.Renderer($(template));
+				renderer = new Temples.Renderer($template);
 			}
+			// Store the renderer
+			$template.data("renderer", renderer);
+			return renderer;
 		},
 		destroy:function (name) {
 			if (!name) {
@@ -459,6 +464,17 @@
 		}
 	};
 	Temples.register = Temples.prepare;
+
+	/**
+	 * Add the Temples .render() method on jquery elements
+	 */
+	if ($.fn && !$.fn.render) {
+		$.fn.render = function(data) {
+			var renderer = $(this).data("renderer");
+			if (renderer) renderer.render(data);
+			return this;
+		};
+	}
 
 	if (context === window) { // browser context
 		context["Temples"] = Temples; // exports Temples under its name in the global space
