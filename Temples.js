@@ -3,7 +3,7 @@
  * ============
  * Author: Eidolon Labs (zipang)
  * Source : http://github.com/zipang/Temples
- * Date: 2013-11-25
+ * Date: 2013-11-29
  * v0.2.2
  */
 (function (context, $) {
