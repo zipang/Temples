@@ -1,5 +1,9 @@
 CHANGELOG
 ----------------------
+v0.2.2
+[2013-11-29]
+ * [Added]: .render() method on jQuery elements
+ * [Fixed]: Added shim for String.prototype.trim()
 
 v0.2.1
 [2013-11-21]
