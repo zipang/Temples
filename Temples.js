@@ -14,15 +14,18 @@
 
 	// Utilities
 
-	// shims
+	// SHIMS
 	if (!console) window.console = {log: function() {}};
 
-	var stringProto = String.prototype;
-	stringProto.startsWith = stringProto.startsWith || function(str) {
+	var sProto = String.prototype;
+	sProto.startsWith = sProto.startsWith || function(str) {
 		return (this.indexOf(str) === 0);
 	};
-	stringProto.contains = stringProto.contains || function(str) {
+	sProto.contains = sProto.contains || function(str) {
 		return (this.indexOf(str) !== -1);
+	};
+	sProto.trim = sProto.trim || function() {
+		return this.replace(/^\s+|\s+$/g, "");
 	};
 
 	/**
@@ -82,7 +85,7 @@
 		},
 		/**
 		 * Render the data and output the DOM to flat HTML
-		 * @return {String} 
+		 * @return {String}
 		 */
 		output:function (data) {
 			this.render(data);
@@ -103,7 +106,7 @@
 		},
 		/**
 		 * Exports the current inner HTML rendering
-		 * @return {String} 
+		 * @return {String}
 		 */
 		toHtml:function () {
 			return this.$root.html();
@@ -207,9 +210,9 @@
 
 
 	/**
-	 * A specific type of Renderer that iterates 
+	 * A specific type of Renderer that iterates
 	 * a sub template over values of a collection
-	 * 
+	 *
 	 * @param $elt
 	 * @param loopExpr value of 'data-iterate' or 'data-each'
 	 * the loop expression has the following forms :
@@ -401,16 +404,16 @@
 		$elt.removeAttr("data-bind data-render-if data-iterate data-each");
 
 		if (loopExpr) {
-			return new ListRenderer($elt, loopExpr, condition, dataBind); 
+			return new ListRenderer($elt, loopExpr, condition, dataBind);
 
 		} else if (condition) {
-			return new ConditionalElementRenderer($elt, condition, dataBind); 
+			return new ConditionalElementRenderer($elt, condition, dataBind);
 
 		} else if (dataBind && dataBind.contains(",")) {
-			return new SimpleElementRenderer($elt, dataBind); 
+			return new SimpleElementRenderer($elt, dataBind);
 
 		} else if (dataBind) {
-			return new AttributeRenderer($elt, dataBind); 
+			return new AttributeRenderer($elt, dataBind);
 		}
 	};
 
