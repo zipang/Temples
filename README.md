@@ -221,7 +221,7 @@ var myPage = new Temples.Renderer(window.document);
 myPage.render({ some: "data", more: "coming soon", ... });
 
 // update just an element in the page
-myPage.update({ "path.to.some.element: "new value" });
+myPage.update({ "path.to.some.element": "new value" });
 
 // later..
 myPage.destroy();
