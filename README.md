@@ -1,7 +1,8 @@
 ![temples](https://raw.github.com/zipang/Temples/master/images/temples.png)
 
 # Synopsis
-`Temples` (templ*at*es that you won't hate) is the most easy to use templating system for HTML.
+`Temples` (templ*at*es that you won't hate) is a templating system for HTML.
+`Temples` is _very_ easy to use and can be learned in 5 minutes.
 `Temples` is a declarative, DOM-based rendering engine, depending on jQuery, that has a special ability for real-time/partial updates.
 *Templates* are just plain old HTML pages blocks or fragments with special `data-bind` attributes.
 `Temples` works inside the browser or with your all-time favorite [Node.js](http://nodejs.org/) environment.
@@ -91,13 +92,13 @@ Notice how *we don't have to get rid* of the sample text, so that the markup sti
 Depending on the context, `value=` or `html=` can be ommited so that :
 
 ```html
-<div data-bind="html=user.name" />
+<div data-bind="html=user.fullname" >John DOE</div>
 ```
 
 is equivalent to :
 
 ```html
-<div data-bind="user.name" />
+<div data-bind="user.fullname" >John DOE</div>
 ```
 
 and
