@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Create well-formatted commits with conventional commit messages and emoji. Use when the user asks to commit changes, run the /commit command, or says "commit my changes". Each commit is atomic and uses a conventional message (<emoji> <type>: <description>). Asks for human confirmation before every commit or push.
+description: Create well-formatted commits with conventional commit messages and emoji. Use when the user asks to commit changes, run the /commit command, or says "commit my changes". Each commit is atomic and uses a conventional message (<emoji> <type>: <description>). Confirms every commit with the question tool before executing.
 ---
 
 # Git Commit
@@ -19,7 +19,8 @@ You are an AI agent that helps create well-formatted git commits with convention
    - Run `git status --porcelain` to check for changes.
    - If no files are staged:
      - Use the provided context/arguments to identify which files to stage.
-     - If the arguments are ambiguous or missing, identify logical groups of changes and ask the user which files or group to stage.
+     - If the arguments are ambiguous or missing, identify logical groups of changes.
+     - Use the `question` tool to let the user select the group to stage and commit.
      - **NEVER** run `git add .` automatically if multiple unrelated changes exist.
    - If files are already staged, proceed with only those files.
 
@@ -30,11 +31,37 @@ You are an AI agent that helps create well-formatted git commits with convention
 4. **Generate commit message**:
    - Format: `<emoji> <type>: <description>`
    - Use the imperative mood and keep the first line under 72 characters.
-   - **Propose the plan**: Show the user the list of files to be committed and the proposed message.
-   - **Wait for confirmation**: Ask the user for explicit permission to execute the commit using a `(YES|no)` prompt where `YES` is the default.
 
-5. **Execute the commit**:
-   - **ONLY** after receiving explicit approval (e.g., "Yes", "Proceed", "Commit"), run `git commit -m "<generated message>"`.
+5. **Confirm the commit with the `question` tool**:
+   - Always confirm a commit with the `question` tool. Never use a text prompt.
+   - Set the question to `Commit <file list> with the following message:`.
+   - Set the first option to the proposed message. This option is the default. The user confirms it with the ENTER key.
+   - Set the second option to `Type your own message for this commit.`
+   - Set `custom` to `false` so the tool does not add a duplicate option.
+
+   Example :
+
+   ```json
+   {
+     "questions": [
+       {
+         "header": "Commit confirmation",
+         "question": "Commit README.md, tasks/plan.md, tasks/todo.md with the following message:",
+         "options": [
+           { "label": "(default) 📝 docs: revise plan around standalone engine and SSR entry" },
+           { "label": "Type your own message for this commit." }
+         ],
+         "custom": false
+       }
+     ]
+   }
+   ```
+
+   - If the user confirms the default option, run the commit as proposed.
+   - If the user selects the custom option, ask for the message, then run the commit.
+
+6. **Execute the commit**:
+   - **ONLY** after the `question` tool confirms the commit, run `git commit -m "<message>"`.
    - Run `git push` if part of the approved plan.
    - Display the commit hash and success message.
 
