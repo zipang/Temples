@@ -1,7 +1,13 @@
-# TEMPLES 1.0: WEB COMPONENTS WITH DECLARATIVE RENDERING
+# TEMPLES 1.0: DECLARATIVE HTML TEMPLATING
 
 This project is a rewriting of the original [Temples](https://github.com/zipang/Temples) template system based on jQuery.
-This new iteration is replacing jQuery with a fully standard compliant implementation based on the web component lifecycle.
+The new iteration replaces jQuery with a standard, DOM-based templating engine.
+
+The engine is available in three forms :
+
+- The standalone `Temples` object for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
+- The `TemplesComponent` base class for declarative Web Components.
+- A jQuery plugin (`temples/jquery`) that renders data into matched elements.
 
 ## DATA BINDING SYNTAX
 
@@ -125,12 +131,110 @@ The test can be done against a function in the data if needed :
 }
 ```
 
+## STANDALONE TEMPLATE ENGINE
+
+The binding engine is a standalone module. It does not depend on the Web Component lifecycle.
+You can use it directly with the `Temples` object, or build your own renderer with the `Renderer` class.
+
+### `Temples.prepare(name, source)`
+
+Registers a template under a name and returns a compiled `Renderer`.
+The source can be :
+
+- an HTML string with the full template content.
+- a DOM element.
+- a selector that starts with `#` (browser only).
+
+```javascript
+Temples.prepare("logged-user", "#logged-user"); // DOM id
+Temples.prepare("logged-user", document.getElementById("logged-user")); // DOM element
+Temples.prepare("logged-user", '<div><span data-bind="user.firstname">John</span></div>'); // HTML string
+```
+
+`register` is a synonym for `prepare`.
+
+### `Temples.render(name, data)`
+
+Renders the registered template with the data and returns the updated template DOM.
+The returned DOM lets you insert, clone, or serialize the result.
+
+```javascript
+const result = Temples.render("logged-user", user);
+document.body.appendChild(result);
+```
+
+### `Temples.renderToString(name, data)`
+
+Renders the registered template with the data and returns the serialized HTML string.
+This method is the entry point for server-side rendering (SSR) and static site generation (SSG).
+
+```javascript
+import { Temples } from "temples";
+import "temples/ssr";
+
+Temples.prepare("article", articleTemplateMarkup);
+
+const html = Temples.renderToString("article", {
+  article: {
+    title: "The Great Race",
+    quotes: ["Quiet!", "Pardon me Mr Partner."]
+  }
+});
+
+// Write the HTML string to a file with your runtime file API (Bun, Node.js, Deno).
+```
+
+### `Temples.update(name, partial)`
+
+Updates only the given data paths in the registered template.
+All other bound values keep their state.
+This method suits real-time partial updates.
+
+```javascript
+Temples.update("logged-user", { "user.status": "away" });
+```
+
+### `Temples.destroy(name)`
+
+Releases a registered template and frees all bound elements.
+
+### The `Renderer` class
+
+You can build a renderer without a registry :
+
+```javascript
+import { Renderer } from "temples";
+
+const renderer = new Renderer(templateElementOrString);
+renderer.render(data); // update all bindings
+renderer.update({ "user.name": "Jane" }); // update only one path
+const html = renderer.renderToString(); // serialized HTML
+renderer.destroy();
+```
+
+`toHtml()` is a synonym for `renderToString()`.
+
+### Server-side rendering
+
+The engine operates on a DOM.
+In the browser it uses the native `document`.
+On the server there is no DOM, so the engine uses [linkedom](https://github.com/WebReflection/linkedom) to parse and serialize the HTML.
+
+Import the SSR entry to use the engine on the server :
+
+```javascript
+import "temples/ssr";
+```
+
+The `temples/ssr` entry wires the engine to linkedom.
+The main entry never imports linkedom, so browser bundles stay small.
+
 ## WEB COMPONENT IMPLEMENTATION
 
 ### 1. Declaration
 
-The new implementation is entirely contained in our new exported class: `TemplesComponent`.
-Instead of inheriting from `HTMLElement` to create a new Web component, all you have to do instead is inheriting from `TemplesComponent` :
+The Web Component implementation is contained in our exported class `TemplesComponent`.
+Instead of inheriting from `HTMLElement` to create a new Web component, you inherit from `TemplesComponent` :
 
 ```typescript
 import { TemplesComponent } from "./Temples";
@@ -225,8 +329,10 @@ The internal rendering pipeline :
 - **`render()`** (internal) — re-renders all `data-bind` / `data-iterate` / `data-render-if` bindings from the current `this.data`.
 - **`update(propertyPath, value)`** (internal) — patches a single path in `this.data` (e.g. `"article.title"`) and re-renders only the affected binding. This enables efficient partial updates, ideal for real-time pushed notifications.
 
-These methods are **not part of the public API**.
-External code must not call `render(data)` to arbitrarily overwrite state — the current attribute values are the source of truth that dictates the internal state.
+These methods are **internal to the component**.
+External code must not call `render(data)` to arbitrarily overwrite component state.
+The current attribute values are the source of truth that dictates the component state.
+The same binding engine is public through the `Temples` object and the `Renderer` class (see [Standalone template engine](#standalone-template-engine)).
 
 To change a component's state, use either :
 
@@ -329,13 +435,15 @@ Not directly accessible or modifiable from outside the component.
 
 Re-renders all `data-bind`, `data-iterate`, and `data-render-if` bindings from the current `this.data`.
 Called automatically when attributes change.
-Accessible from event handlers and internal component logic, but **not part of the public API**.
+Accessible from event handlers and internal component logic, but **internal to the component**.
+Delegates to the shared `Renderer` engine (see [Standalone template engine](#standalone-template-engine)).
 
 #### `update(propertyPath, value)`
 
 Patches a single path in `this.data` (e.g. `"article.title"`) and re-renders only the affected binding.
 Enables efficient partial updates without re-rendering the entire component.
-Accessible from event handlers and internal component logic, but **not part of the public API**.
+Accessible from event handlers and internal component logic, but **internal to the component**.
+Delegates to the shared `Renderer` engine's partial update.
 
 ### Public methods (user-defined)
 
@@ -373,6 +481,25 @@ const events = {
 };
 registerEvents(host, events);
 ```
+
+## JQUERY PLUGIN
+
+A separate, tree-shakeable export provides the jQuery-compatible version of the engine.
+Import the `temples/jquery` entry to register the plugin :
+
+```javascript
+import "temples/jquery";
+```
+
+The plugin adds the `$.fn.temples` method :
+
+```javascript
+$(".list").temples(data); // render data into each matched element
+const renderer = $(".list").temples(); // get the prepared Renderer
+```
+
+jQuery is a peer dependency of this export.
+The main entry never touches `$`.
 
 ## Complete example: flipping-card
 
