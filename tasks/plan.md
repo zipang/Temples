@@ -45,8 +45,8 @@ The standalone, DOM-based engine. Contains:
 - Template parsing: accept a DOM element or an HTML string, parse the string once into a container.
 - Path resolver — resolves dotted paths (`article.title`) against data, evaluates function values.
 - `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax. The shorthand (no `=`) defaults to `text=` semantics for non-input elements (a deliberate, safer deviation from the original v0, which defaulted to `html=`) and to `value=` semantics on form controls (INPUT, TEXTAREA, SELECT).
-- `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template.
-- `data-render-if` handler — boolean conditional show/hide.
+- `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template. Implemented in T4.
+- `data-render-if` handler — boolean conditional show/hide. Implemented in T4.
 - `render(data)` — full binding walk and apply.
 - `update({ path: value })` — partial binding update via the internal binding map (path → element).
 - `toHtml()` / `renderToString()` — serialized HTML of the rendered template.
@@ -206,8 +206,10 @@ Resolved during the plan review:
 5. **`update()` semantics** (RESOLVED) — The engine uses the original `{ path: value }` map form. The component keeps the `(path, value)` pair as a convenience wrapper.
 6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
 7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. On form controls (INPUT, TEXTAREA, SELECT) the shorthand defaults to `value=`. Implemented in T3.
+8. **Iterate context** (RESOLVED — T4) — `data-iterate` renders each item with the variable merged into a shallow copy of the data dictionary, so the caller's data object is never mutated (v0 wrote the item into the data object in place). The sub-template is the container's first element child, detached at construction and re-stamped per item.
+9. **`data-render-if` hiding** (RESOLVED — T4) — A falsy condition hides the element with `display: none`; the authored inline `display` value is restored when the condition turns truthy. This replaces v0's placeholder-comment removal, a jQuery `replaceWith` technique.
 
 Still open:
 
 7. **Attribute value types** — HTML attributes are always strings. How should non-string values (arrays, objects, numbers, booleans) be handled? Options: JSON-encoded attributes, comma-separated arrays, or a component-level `parseAttribute(name, value)` hook. Default assumption: string values, component enriches `this.data` via internal logic.
-8. **`data-iterate` re-rendering** — When a collection changes, old cloned items are removed and new ones stamped. The binding map tracks iterated blocks. Resolve during T4/T5.
+8. **`data-iterate` re-rendering** (partially resolved — T4) — A re-render clears the stamped clones and re-stamps them from the detached sub-template, so collection changes are reflected in full `render()`. The remaining piece is the binding map (path → element) for `update()` partial re-renders, which T5 builds.

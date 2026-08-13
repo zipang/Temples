@@ -24,10 +24,11 @@ Follow `test-driven-development` for each task: failing test first, then impleme
   - Verify: Unit test with `<img data-bind="src=user.avatar, title=user.name">`, `<input data-bind="value=user.name">`, and the class-toggle div — asserts attributes, value, and class list against mock data. Test a second data set for the class toggle.
   - Files: `src/engine.ts`, `src/engine.test.ts`
 
-- [ ] **T4: data-iterate + data-render-if**
+- [x] **T4: data-iterate + data-render-if**
   - Acceptance: `data-iterate="quote: article.quotes"` clones the first child per item, binding `quote`. Auto-naming drops trailing `s` (`article.tags` → `tag`). `data-each` and `from` variants work. `data-render-if` shows/hides based on a truthy condition; function values are called.
   - Verify: Unit test with a 3-item array asserts 3 cloned children with correct bound values, for all syntax variants. Two `data-render-if` elements, one truthy, one falsy.
   - Files: `src/engine.ts`, `src/engine.test.ts`
+  - Notes: Done in three slices. Slice 1 = iterate machinery + `name: path` + auto-naming. Slice 2 = `from` keyword + `data-each` synonym. Slice 3 = `data-render-if` (truthy/falsy, function conditions, re-render flip, combination with `data-bind`). Combining `data-render-if` with `data-iterate` on one element is not implemented (v0 supports it; deferred).
 
 - [ ] **T5: update({path: value}) partial re-render**
   - Acceptance: `renderer.update({ "article.title": "New" })` patches the data and re-renders only the bindings for those paths. An internal binding map (path → element) gives O(1) lookup.
