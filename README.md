@@ -194,11 +194,16 @@ Temples.prepare("logged-user", '<div><span data-bind="user.firstname">John</span
 ### `Temples.render(name, data)`
 
 Renders the registered template with the data and returns the updated template DOM.
+`render` touches only the paths present in `data`; absent paths keep their current state.
+Pass a full dictionary to render everything, or a flat dotted-path object to update a single path in real time.
 The returned DOM lets you insert, clone, or serialize the result.
 
 ```javascript
 const result = Temples.render("logged-user", user);
 document.body.appendChild(result);
+
+// Real-time partial update of one path only
+Temples.render("logged-user", { "user.status": "away" });
 ```
 
 ### `Temples.renderToString(name, data)`
@@ -222,16 +227,6 @@ const html = Temples.renderToString("article", {
 // Write the HTML string to a file with your runtime file API (Bun, Node.js, Deno).
 ```
 
-### `Temples.update(name, partial)`
-
-Updates only the given data paths in the registered template.
-All other bound values keep their state.
-This method suits real-time partial updates.
-
-```javascript
-Temples.update("logged-user", { "user.status": "away" });
-```
-
 ### `Temples.destroy(name)`
 
 Releases a registered template and frees all bound elements.
@@ -244,8 +239,8 @@ You can build a renderer without a registry :
 import { Renderer } from "temples";
 
 const renderer = new Renderer(templateElementOrString);
-renderer.render(data); // update all bindings
-renderer.update({ "user.name": "Jane" }); // update only one path
+renderer.render(data); // renders the paths present in data
+renderer.render({ "user.name": "Jane" }); // re-render only that path
 const html = renderer.renderToString(); // serialized HTML
 renderer.destroy();
 ```
@@ -481,7 +476,7 @@ Delegates to the shared `Renderer` engine (see [Standalone template engine](#sta
 Patches a single path in `this.data` (e.g. `"article.title"`) and re-renders only the affected binding.
 Enables efficient partial updates without re-rendering the entire component.
 Accessible from event handlers and internal component logic, but **internal to the component**.
-Delegates to the shared `Renderer` engine's partial update.
+Delegates to the shared engine's `render()` with a flat dotted-path delta.
 
 ### Public methods (user-defined)
 

@@ -15,15 +15,14 @@ Standalone engine (DOM-based, shared):
   ┌────────────────────────────────────────────────────────────┐
   │  Renderer (per template)                                   │
   │    template source: DOM element | HTML string | #id        │
-  │    render(data)   → walk bindings, apply values            │
-  │    update({path: value}) → partial re-render (binding map) │
+  │    render(data)   → render only the paths present in data  │
   │    toHtml() / renderToString() → serialized HTML           │
   │    destroy()                                              │
   │                                                            │
   │  Temples registry                                          │
   │    prepare(name, source) / register(...)                   │
   │    render(name, data) / renderToString(name, data)         │
-  │    update(name, partial) / destroy(name)                   │
+  │    destroy(name)                                           │
   └────────────────────────────────────────────────────────────┘
 
 Consumers:
@@ -47,8 +46,7 @@ The standalone, DOM-based engine. Contains:
 - `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax. The shorthand (no `=`) defaults to `text=` semantics for non-input elements (a deliberate, safer deviation from the original v0, which defaulted to `html=`) and to `value=` semantics on form controls (INPUT, TEXTAREA, SELECT).
 - `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template. Implemented in T4.
 - `data-render-if` handler — boolean conditional show/hide. Implemented in T4.
-- `render(data)` — full binding walk and apply.
-- `update({ path: value })` — partial binding update via the internal binding map (path → element).
+- `render(data)` — renders only the paths present in the data, via the internal path → operation map (O(1) lookup). A flat dotted-path delta re-renders a single binding. Implemented in T5.
 - `toHtml()` / `renderToString()` — serialized HTML of the rendered template.
 - `destroy()` — release bindings (fights zombie templates).
 
@@ -57,7 +55,6 @@ The static API, faithful to the original:
 - `prepare(name, source)` and `register(name, source)` (synonym) — `source` is a DOM element, an HTML string, or a `#id` selector (browser only).
 - `render(name, data)` — returns the updated template DOM.
 - `renderToString(name, data)` — returns the serialized HTML string.
-- `update(name, partial)` — partial re-render.
 - `destroy(name)` — release the registered renderer.
 
 ### 3. `TemplesComponent` base class (`index.ts`)
@@ -65,7 +62,7 @@ A thin consumer of the core engine. Contains:
 - `static define()` — template parsing + custom element registration.
 - Lifecycle hooks — `connectedCallback`, `disconnectedCallback`, `attributeChangedCallback`.
 - `render()` (internal) — delegates to the engine over its own root.
-- `update(path, value)` (internal) — convenience wrapper over the engine's partial update.
+- `update(path, value)` (internal) — convenience wrapper that re-renders one path through `render({ path: value })`.
 - `this.data` (private) — aggregated state from attributes.
 
 The component's `render()` and `update()` stay internal to the component. The same binding engine is public through the `Temples` object and the `Renderer` class.
@@ -153,7 +150,7 @@ Phase 2: Core engine (DOM-based, browser)
   T2: Renderer skeleton + template sources (element | string) + data-bind text/html + shorthand (defaults to text)
   T3: data-bind typed bindings + multiple + class[a|b|c]
   T4: data-iterate (all variants) + data-render-if
-  T5: update({path: value}) partial re-render via binding map
+  T5: render(data) renders only the paths present in the data
   T6: Temples registry + toHtml()/renderToString()
 
 Phase 3: SSR
@@ -183,7 +180,7 @@ Phase 6: Example & Polish
 | The main bundle may include linkedom or jQuery, breaking tree-shaking | Separate entry points (`./ssr`, `./jquery`) plus `sideEffects` flags; verify with a build check |
 | jQuery peer dependency missing → plugin import fails | Detect the absence of `$` and throw a clear error |
 | Light DOM template stamping may conflict with user-provided children | Document that the template replaces children; test with pre-existing children |
-| `update()` partial re-render needs to find the specific DOM element bound to a path | Maintain an internal binding map (path → element) during `render()` for O(1) lookup |
+| Partial render must re-apply only the operations bound to the given paths | Index operations by path (path → operation) during construction for O(1) lookup |
 
 ## Verification Checkpoints
 
@@ -203,13 +200,14 @@ Resolved during the plan review:
 2. **Server DOM strategy** (RESOLVED) — Single DOM-based engine. The `./ssr` entry wires linkedom for server-side rendering. `renderToString` works in the browser and on the server.
 3. **Component SSR** (RESOLVED — not included) — `TemplesComponent` stays browser-only. The standalone engine covers the SSG use case.
 4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Temples` and `Renderer`.
-5. **`update()` semantics** (RESOLVED) — The engine uses the original `{ path: value }` map form. The component keeps the `(path, value)` pair as a convenience wrapper.
+5. **`update()` semantics** (RESOLVED — superseded by T5) — The engine originally planned a `{ path: value }` partial update. T5 replaced it with a unified `render(data)`: render touches only the paths present in the data, so a flat dotted-path delta achieves the same result through `render` and no separate method is needed. The component keeps the `(path, value)` pair as a convenience wrapper over `render({ path: value })`.
 6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
 7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. On form controls (INPUT, TEXTAREA, SELECT) the shorthand defaults to `value=`. Implemented in T3.
 8. **Iterate context** (RESOLVED — T4) — `data-iterate` renders each item with the variable merged into a shallow copy of the data dictionary, so the caller's data object is never mutated (v0 wrote the item into the data object in place). The sub-template is the container's first element child, detached at construction and re-stamped per item.
 9. **`data-render-if` hiding** (RESOLVED — T4) — A falsy condition hides the element with `display: none`; the authored inline `display` value is restored when the condition turns truthy. This replaces v0's placeholder-comment removal, a jQuery `replaceWith` technique.
+10. **Unified render** (RESOLVED — T5) — `render(data)` is the only rendering method. It resolves every dotted path present in the data and applies only the operations bound to that exact path; absent paths keep their current state. A flat dotted-path delta (`{ "article.title": "New" }`) re-renders one binding, so a separate `update()` method was dropped. The binding map is path → operation (refining the earlier "path → element" wording), giving O(1) lookup. The DOM is the state; the renderer retains no data between calls.
 
 Still open:
 
 7. **Attribute value types** — HTML attributes are always strings. How should non-string values (arrays, objects, numbers, booleans) be handled? Options: JSON-encoded attributes, comma-separated arrays, or a component-level `parseAttribute(name, value)` hook. Default assumption: string values, component enriches `this.data` via internal logic.
-8. **`data-iterate` re-rendering** (partially resolved — T4) — A re-render clears the stamped clones and re-stamps them from the detached sub-template, so collection changes are reflected in full `render()`. The remaining piece is the binding map (path → element) for `update()` partial re-renders, which T5 builds.
+8. **`data-iterate` re-rendering** (RESOLVED — T4/T5) — A re-render clears the stamped clones and re-stamps them from the detached sub-template. Since T5, rendering the collection path in a `render()` delta re-stamps the list, and any other path leaves it untouched. Bindings inside an iterated sub-template are not individually updatable; the iterate re-stamp refreshes them.

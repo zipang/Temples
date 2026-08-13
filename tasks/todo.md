@@ -30,13 +30,14 @@ Follow `test-driven-development` for each task: failing test first, then impleme
   - Files: `src/engine.ts`, `src/engine.test.ts`
   - Notes: Done in three slices. Slice 1 = iterate machinery + `name: path` + auto-naming. Slice 2 = `from` keyword + `data-each` synonym. Slice 3 = `data-render-if` (truthy/falsy, function conditions, re-render flip, combination with `data-bind`). Combining `data-render-if` with `data-iterate` on one element is not implemented (v0 supports it; deferred).
 
-- [ ] **T5: update({path: value}) partial re-render**
-  - Acceptance: `renderer.update({ "article.title": "New" })` patches the data and re-renders only the bindings for those paths. An internal binding map (path → element) gives O(1) lookup.
-  - Verify: Unit test with multiple bindings — update one path, assert only that element changes.
-  - Files: `src/engine.ts`, `src/engine.test.ts`
+- [x] **T5: render only the paths present in the data (unified full/partial render)**
+  - Acceptance: `render(data)` resolves every dotted path present in `data` and applies only the operations bound to that exact path; absent paths keep their current state. A flat delta `{ "article.title": "New" }` re-renders one binding (replacing a separate `update()` method). An internal path → operation map gives O(1) lookup. Iterate seeds and render-if conditions participate through the same map.
+  - Verify: Unit test renders two bindings then a single-path delta, asserting only that element changes. Tests cover untouched absent paths, explicit empty-value clearing, iterate re-stamp, and render-if re-evaluation.
+  - Files: `src/engine.ts`, `src/engine.test.ts`, `README.md`
+  - Notes: `update()` was dropped to keep the API minimal — `render(data)` renders only what it receives. The DOM is the state; no data is retained between calls. Bindings inside an iterated sub-template are not individually updatable; the iterate re-stamp refreshes them.
 
 - [ ] **T6: Temples registry + toHtml()/renderToString()**
-  - Acceptance: `Temples.prepare(name, source)` registers a template. `Temples.render(name, data)` returns the template DOM. `Temples.renderToString(name, data)` returns serialized HTML. `Temples.update(name, partial)` and `Temples.destroy(name)` work. `register` is a synonym for `prepare`. `Renderer#toHtml()` matches `renderToString()`.
+  - Acceptance: `Temples.prepare(name, source)` registers a template. `Temples.render(name, data)` returns the template DOM (a flat dotted-path delta re-renders one path). `Temples.renderToString(name, data)` returns serialized HTML. `Temples.destroy(name)` works. `register` is a synonym for `prepare`. `Renderer#toHtml()` matches `renderToString()`.
   - Verify: Unit test registers a template by name, renders data, asserts the returned DOM and the serialized string match expected markup.
   - Files: `src/temples.ts`, `temples.test.ts`
 
