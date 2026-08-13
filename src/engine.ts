@@ -100,6 +100,37 @@ export const evalProperty = (path: string, data: TemplesData): RenderValue => {
 };
 
 /**
+ * Write a value at a dotted path, creating missing intermediate dictionaries.
+ *
+ * An intermediate that is not a dictionary is replaced by an empty
+ * dictionary. A dotted key lets a render delta address a nested path
+ * directly, e.g. `"article.title"`.
+ *
+ * @param data - The dictionary to write into.
+ * @param path - Dotted path, e.g. `"article.title"`.
+ * @param value - The value to write at the path.
+ */
+const setPath = (data: TemplesData, path: string, value: TemplesDataValue): void => {
+	const parts = path.split(".");
+	const last = parts.pop();
+
+	if (last === undefined) return;
+
+	let current: TemplesData = data;
+
+	for (const part of parts) {
+		const next = current[part];
+		const branch: TemplesData =
+			next != null && typeof next === "object" && !Array.isArray(next) ? next : {};
+
+		current[part] = branch;
+		current = branch;
+	}
+
+	current[last] = value;
+};
+
+/**
  * Give the renderer one stable root element to bind against and re-render.
  *
  * An HTML string is a fragment, not an element: it can contain several
@@ -276,16 +307,17 @@ const parseBindings = (expr: string, el: Element): ParsedBinding[] => {
 	return bindings;
 };
 
-type Operation = { apply: (data: TemplesData) => void };
+type Operation = { path: string; apply: (data: TemplesData) => void };
 
 /**
  * Build the closure that applies one binding to its element during render.
  *
  * @param el - The bound DOM element.
  * @param parsed - The parsed binding.
- * @returns An operation that applies the binding to the element.
+ * @returns An operation bound to the binding's data path.
  */
 const makeBinding = (el: Element, parsed: ParsedBinding): Operation => ({
+	path: parsed.path,
 	apply: (data: TemplesData) => {
 		const value = String(evalProperty(parsed.path, data));
 
@@ -357,6 +389,7 @@ const buildIterate = (el: Element, loopExpr: string): Operation => {
 	el.removeChild(template);
 
 	return {
+		path: seed,
 		apply: (data: TemplesData) => {
 			const resolved = resolvePath(seed, data);
 			const collection = resolved !== null && Array.isArray(resolved.value) ? resolved.value : [];
@@ -388,6 +421,7 @@ const buildRenderIf = (el: HTMLElement, condition: string): Operation => {
 	const originalDisplay = el.style.display;
 
 	return {
+		path: condition,
 		apply: (data: TemplesData) => {
 			el.style.display = evalProperty(condition, data) ? originalDisplay : "none";
 		}
@@ -460,29 +494,104 @@ const collectOperations = (root: Element): Operation[] => {
 };
 
 /**
+ * Normalise a render input into a nested data dictionary.
+ *
+ * A flat delta uses dotted keys, e.g. `{ "article.title": "New" }`; each key
+ * is written as a nested path. A nested dictionary is rebuilt with its
+ * top-level values kept by reference. Blank keys are skipped.
+ *
+ * @param input - A data dictionary or a flat dotted-path delta.
+ * @returns A nested dictionary.
+ */
+const normalize = (input: TemplesData): TemplesData => {
+	const data: TemplesData = {};
+
+	for (const [key, value] of Object.entries(input)) {
+		const path = key.trim();
+
+		if (path.length === 0) continue;
+
+		setPath(data, path, value);
+	}
+
+	return data;
+};
+
+/**
+ * Collect every dotted path present in a data dictionary.
+ *
+ * Dictionaries are walked recursively so a nested value contributes each of
+ * its paths, e.g. `{ article: { title: "x" } }` yields `article` and
+ * `article.title`. Arrays, functions, and scalars are leaves and do not
+ * descend.
+ *
+ * @param data - The data dictionary to walk.
+ * @returns The dotted paths, top-down in object order.
+ */
+const enumeratePaths = (data: TemplesData): string[] => {
+	const paths: string[] = [];
+
+	const walk = (dict: TemplesData, prefix: string): void => {
+		for (const [key, value] of Object.entries(dict)) {
+			const path = prefix === "" ? key : `${prefix}.${key}`;
+
+			paths.push(path);
+
+			if (value != null && typeof value === "object" && !Array.isArray(value)) {
+				walk(value, path);
+			}
+		}
+	};
+
+	walk(data, "");
+
+	return paths;
+};
+
+/**
  * Standalone, DOM-based renderer for a single template.
  *
- * Parses the template source once into a DOM element, collects its
- * `data-bind` bindings, and applies them on every `render` call.
+ * Parses the template source once into a DOM element, indexes every operation
+ * by its data path, and renders only the paths present in each render call.
  */
 export class Renderer {
 	readonly root: Element;
-	private readonly operations: Operation[];
+	private readonly byPath: Map<string, Operation[]>;
 
 	constructor(source: Element | string) {
 		this.root = toElement(source);
-		this.operations = collectOperations(this.root);
+		this.byPath = new Map();
+
+		for (const operation of collectOperations(this.root)) {
+			const list = this.byPath.get(operation.path);
+
+			if (list !== undefined) {
+				list.push(operation);
+			} else {
+				this.byPath.set(operation.path, [operation]);
+			}
+		}
 	}
 
 	/**
-	 * Apply every operation to the template with the provided data.
+	 * Render the paths present in the provided data.
 	 *
-	 * @param data - Data dictionary to resolve operation paths against.
+	 * Every dotted path in the data is resolved, and the operations bound to
+	 * that exact path are applied. Paths absent from the data keep their
+	 * current state. A flat delta such as `{ "article.title": "New" }`
+	 * re-renders only that binding, while a full dictionary re-renders every
+	 * present path.
+	 *
+	 * @param input - Data dictionary or flat dotted-path delta.
 	 * @returns The rendered root element.
 	 */
-	render(data: TemplesData): Element {
-		for (const operation of this.operations) {
-			operation.apply(data);
+	render(input: TemplesData): Element {
+		const data = normalize(input);
+
+		for (const path of enumeratePaths(data)) {
+			for (const operation of this.byPath.get(path) ?? []) {
+				operation.apply(data);
+			}
 		}
 
 		return this.root;

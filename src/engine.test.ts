@@ -120,10 +120,19 @@ describe("Renderer", () => {
 		expect(renderer.root.textContent).toBe("Vince Voe");
 	});
 
-	test("a missing path clears the bound content", () => {
+	test("a missing path is left untouched when the data does not carry it", () => {
 		const renderer = new Renderer("<h1 data-bind='text=missing'>initial</h1>");
 
 		renderer.render({});
+
+		expect(renderer.root.textContent).toBe("initial");
+	});
+
+	test("a path is cleared when the data carries an explicit empty value", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>initial</h1>");
+
+		renderer.render({ title: "Hello" });
+		renderer.render({ title: "" });
 
 		expect(renderer.root.textContent).toBe("");
 	});
@@ -480,5 +489,62 @@ describe("Renderer data-render-if", () => {
 		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
 
 		expect(renderer.root.hasAttribute("data-render-if")).toBe(false);
+	});
+});
+
+describe("Renderer partial render", () => {
+	test("renders only the paths present in a flat dotted-path delta", () => {
+		const renderer = new Renderer(
+			"<article><h1 data-bind='text=article.title'></h1><p data-bind='text=article.body'></p></article>"
+		);
+
+		renderer.render({ article: { title: "Old", body: "Body" } });
+		renderer.render({ "article.title": "New" });
+
+		expect(renderer.root.querySelector("h1")?.textContent).toBe("New");
+		expect(renderer.root.querySelector("p")?.textContent).toBe("Body");
+	});
+
+	test("keeps every binding when the delta carries no matching path", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>initial</h1>");
+
+		renderer.render({ title: "Hello" });
+		renderer.render({ other: "x" });
+
+		expect(renderer.root.textContent).toBe("Hello");
+	});
+
+	test("re-stamps an iterate when its collection path is in the delta", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["A", "B"] } });
+		renderer.render({ "article.quotes": ["X", "Y", "Z"] });
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items.length).toBe(3);
+		expect(items[0]?.textContent).toBe("X");
+	});
+
+	test("keeps an iterate list when its collection path is absent from the data", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["A", "B"] } });
+		renderer.render({ other: "x" });
+
+		expect(renderer.root.querySelectorAll("li").length).toBe(2);
+	});
+
+	test("re-evaluates a render-if when its condition path is in the delta", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
+
+		renderer.render({ article: { featured: true } });
+		renderer.render({ "article.featured": false });
+
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
 	});
 });
