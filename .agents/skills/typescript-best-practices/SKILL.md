@@ -25,12 +25,12 @@ Name the values the function can produce or consume. A resolver that feeds DOM t
 Good:
 ```ts
 export type RenderValue = string | number | boolean;
-export const evalProperty = (path: string, data: TemplesData): RenderValue => { /* ... */ }
+export const readProperty = (path: string, data: TemplesData): RenderValue => { /* ... */ }
 ```
 
 Bad:
 ```ts
-export const evalProperty = (path: string, data: unknown): unknown => { /* ... */ }
+export const readProperty = (path: string, data: unknown): unknown => { /* ... */ }
 ```
 
 ### 2. `unknown` only at true boundaries
@@ -66,7 +66,7 @@ Use `typeof`, `instanceof`, and `in` checks to narrow a value. A cast (`as`) ass
 Good (type guard, no cast):
 ```ts
 if (typeof current === "function") {
-	const result = current.call(parent);
+	const result = current.call(owner);
 
 	return result == null ? "" : result;
 }
@@ -83,7 +83,7 @@ Do not widen a return type to avoid a narrow. If every caller coerces the result
 
 ### 7. Type `this` when a function uses it
 
-When a function is called with a parent object as `this`, declare the `this` parameter. Callers get checking and autocomplete on sibling properties.
+When a function is called with its owner object as `this`, declare the `this` parameter. Callers get checking and autocomplete on sibling properties.
 
 ```ts
 export type TemplesDataValue = RenderValue | ((this: TemplesData) => RenderValue) | TemplesData;

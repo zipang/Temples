@@ -24,7 +24,7 @@ export interface TemplesData {
  *
  * A value is a scalar (`RenderValue`), a parameterless function returning a
  * scalar, a nested dictionary, or an array of values. The function is called
- * with its parent dictionary as `this`, so methods can reference sibling
+ * with its owner dictionary as `this`, so methods can reference sibling
  * properties. Arrays feed `data-iterate`.
  */
 export type TemplesDataValue =
@@ -34,60 +34,62 @@ export type TemplesDataValue =
 	| TemplesDataValue[];
 
 /**
- * The result of walking a dotted path against a data dictionary.
+ * A reference to a property located by its path: the property's value and the
+ * dictionary that owns it.
  */
-type ResolvedPath = { value: TemplesDataValue | undefined; parent: TemplesData };
+type PropertyRef = { value: TemplesDataValue | undefined; owner: TemplesData };
 
 /**
- * Walk a dotted property path against a Temples data dictionary.
+ * Find the property at a dotted path in a Temples data dictionary.
  *
- * Intermediate steps must be dictionaries; a path that crosses a scalar, an
- * array, or a missing value does not resolve. The final step may be any
- * value, including an array or a function.
+ * The path is followed through the dictionary. Intermediate steps must be
+ * dictionaries; a path that crosses a scalar, an array, or a missing value
+ * does not reach a property. The final step may hold any value, including an
+ * array or a function.
  *
- * @param path - Dotted path, e.g. `"article.author.name"`.
- * @param data - Root data dictionary to resolve the path against.
- * @returns The resolved value with its parent, or null when the path stops early.
+ * @param path - Dotted path to the property, e.g. `"article.author.name"`.
+ * @param data - Root data dictionary to read the path from.
+ * @returns The property's value with its owner, or null when the path stops early.
  */
-const resolvePath = (path: string, data: TemplesData): ResolvedPath | null => {
+const findProperty = (path: string, data: TemplesData): PropertyRef | null => {
 	const steps = (path ?? "").trim().split(".");
 
 	let current: TemplesDataValue | undefined = data;
-	let parent: TemplesData = data;
+	let owner: TemplesData = data;
 
 	for (const step of steps) {
 		if (current == null || typeof current !== "object" || Array.isArray(current)) return null;
 
-		parent = current;
+		owner = current;
 		current = current[step];
 	}
 
-	return { value: current, parent };
+	return { value: current, owner };
 };
 
 /**
- * Resolve a dotted property path against a Temples data dictionary.
+ * Read the property at a dotted path in a Temples data dictionary.
  *
- * A leaf is a scalar or a parameterless function: the function is called with
- * its parent dictionary as `this` and its result is used. A function that
- * returns `null` or `undefined` yields an empty string. Falsy scalars such as
- * `0` and `false` are preserved; only `null` and `undefined` collapse to an
- * empty string. A path that resolves to a dictionary or an array yields an
- * empty string.
+ * The path is followed to the property. A leaf property is a scalar or a
+ * parameterless function: the function is called with its owner dictionary
+ * as `this` and its result is used. A function that returns `null` or
+ * `undefined` yields an empty string. Falsy scalars such as `0` and `false`
+ * are preserved; only `null` and `undefined` collapse to an empty string. A
+ * path that reaches a dictionary or an array yields an empty string.
  *
- * @param path - Dotted path, e.g. `"article.author.name"`.
- * @param data - Root data dictionary to resolve the path against.
- * @returns Resolved scalar value, function result, or empty string when missing.
+ * @param path - Dotted path to the property, e.g. `"article.author.name"`.
+ * @param data - Root data dictionary to read from.
+ * @returns The property's scalar value, function result, or empty string when missing.
  */
-export const evalProperty = (path: string, data: TemplesData): RenderValue => {
-	const resolved = resolvePath(path, data);
+export const readProperty = (path: string, data: TemplesData): RenderValue => {
+	const resolved = findProperty(path, data);
 
 	if (resolved === null || resolved.value == null) return "";
 
-	const { value, parent } = resolved;
+	const { value, owner } = resolved;
 
 	if (typeof value === "function") {
-		const result: RenderValue | null | undefined = value.call(parent);
+		const result: RenderValue | null | undefined = value.call(owner);
 
 		return result == null ? "" : result;
 	}
@@ -100,17 +102,17 @@ export const evalProperty = (path: string, data: TemplesData): RenderValue => {
 };
 
 /**
- * Write a value at a dotted path, creating missing intermediate dictionaries.
+ * Set the property at a dotted path, creating missing intermediate dictionaries.
  *
- * An intermediate that is not a dictionary is replaced by an empty
- * dictionary. A dotted key lets a render delta address a nested path
- * directly, e.g. `"article.title"`.
+ * The path is followed into the dictionary; an intermediate that is not a
+ * dictionary is replaced by an empty one. A dotted path locates a nested
+ * property directly, e.g. `"article.title"`.
  *
- * @param data - The dictionary to write into.
- * @param path - Dotted path, e.g. `"article.title"`.
- * @param value - The value to write at the path.
+ * @param data - The dictionary holding the property.
+ * @param path - Dotted path to the property, e.g. `"article.title"`.
+ * @param value - The value to assign to the property.
  */
-const setPath = (data: TemplesData, path: string, value: TemplesDataValue): void => {
+const setProperty = (data: TemplesData, path: string, value: TemplesDataValue): void => {
 	const parts = path.split(".");
 	const last = parts.pop();
 
@@ -232,18 +234,18 @@ const applyClass = (el: Element, range: string[], active: string): void => {
 /**
  * Extract the toggled class range from a `class[a|b|c]` expression.
  *
- * @param left - The attribute part of the binding expression.
+ * @param attrPart - The attribute part of the binding expression.
  * @returns The range of class names, or null when the form is not `class[...]`.
  */
-const parseClassRange = (left: string): string[] | null => {
-	const open = left.indexOf("[");
-	const close = left.indexOf("]", open);
+const parseClassRange = (attrPart: string): string[] | null => {
+	const open = attrPart.indexOf("[");
+	const close = attrPart.indexOf("]", open);
 
 	if (open === -1 || close === -1) return null;
 
-	if (left.slice(0, open).trim().toLowerCase() !== "class") return null;
+	if (attrPart.slice(0, open).trim().toLowerCase() !== "class") return null;
 
-	return left
+	return attrPart
 		.slice(open + 1, close)
 		.split("|")
 		.map((name) => name.trim())
@@ -270,15 +272,15 @@ const parseExpression = (expr: string, el: Element): ParsedBinding | null => {
 		return { kind: isFormControl(el) ? "value" : "text", path };
 	}
 
-	const left = expr.slice(0, eq).trim();
+	const attrPart = expr.slice(0, eq).trim();
 	const path = expr.slice(eq + 1).trim();
-	const name = left.toLowerCase();
+	const name = attrPart.toLowerCase();
 
 	if (name === "text") return { kind: "text", path };
 	if (name === "html") return { kind: "html", path };
 	if (name === "value") return { kind: "value", path };
 
-	const range = parseClassRange(left);
+	const range = parseClassRange(attrPart);
 	if (range !== null) return { kind: "class", range, path };
 
 	if (/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(name)) {
@@ -307,19 +309,19 @@ const parseBindings = (expr: string, el: Element): ParsedBinding[] => {
 	return bindings;
 };
 
-type Operation = { path: string; apply: (data: TemplesData) => void };
+type Binding = { path: string; apply: (data: TemplesData) => void };
 
 /**
  * Build the closure that applies one binding to its element during render.
  *
  * @param el - The bound DOM element.
  * @param parsed - The parsed binding.
- * @returns An operation bound to the binding's data path.
+ * @returns A binding that applies one `data-bind` expression during render.
  */
-const makeBinding = (el: Element, parsed: ParsedBinding): Operation => ({
+const buildBinding = (el: Element, parsed: ParsedBinding): Binding => ({
 	path: parsed.path,
 	apply: (data: TemplesData) => {
-		const value = String(evalProperty(parsed.path, data));
+		const value = String(readProperty(parsed.path, data));
 
 		switch (parsed.kind) {
 			case "text":
@@ -351,47 +353,47 @@ const makeBinding = (el: Element, parsed: ParsedBinding): Operation => ({
  * @param loopExpr - The `data-iterate` or `data-each` attribute value.
  * @returns The variable name and the collection path.
  */
-const parseLoop = (loopExpr: string): { varName: string; seed: string } => {
+const parseLoop = (loopExpr: string): { varName: string; collectionPath: string } => {
 	const match = /^\s*(.*?)\s*(?::|from)\s*(.*)$/.exec(loopExpr);
 
 	if (match !== null && (match[2] ?? "").length > 0) {
-		return { varName: match[1] ?? "", seed: match[2] ?? "" };
+		return { varName: match[1] ?? "", collectionPath: match[2] ?? "" };
 	}
 
-	const seed = loopExpr.trim();
-	const last = seed.split(".").pop() ?? "";
+	const collectionPath = loopExpr.trim();
+	const last = collectionPath.split(".").pop() ?? "";
 
-	return { varName: last.replace(/s*$/, ""), seed };
+	return { varName: last.replace(/s*$/, ""), collectionPath };
 };
 
 /**
- * Build the operation that stamps one sub-template clone per collection item.
+ * Build the binding that stamps one sub-template clone per collection item.
  *
  * The first child of the iterate element is the sub-template. It is detached
- * from the container at construction, its operations are collected once, and
+ * from the container at construction, its bindings are collected once, and
  * each item renders a fresh clone. Item values are exposed to the
  * sub-template under the variable name.
  *
  * @param el - The iterate container element.
  * @param loopExpr - The `data-iterate` or `data-each` attribute value.
- * @returns An operation that re-stamps the items on every render.
+ * @returns A binding that re-stamps the items on every render.
  */
-const buildIterate = (el: Element, loopExpr: string): Operation => {
-	const { varName, seed } = parseLoop(loopExpr);
+const buildIterate = (el: Element, loopExpr: string): Binding => {
+	const { varName, collectionPath } = parseLoop(loopExpr);
 	const template = el.firstElementChild;
 
 	if (template === null) {
 		throw new Error(`${el.tagName} data-iterate must have a child element to use as sub-template`);
 	}
 
-	const subOperations = collectOperations(template);
+	const subBindings = collectBindings(template);
 
 	el.removeChild(template);
 
 	return {
-		path: seed,
+		path: collectionPath,
 		apply: (data: TemplesData) => {
-			const resolved = resolvePath(seed, data);
+			const resolved = findProperty(collectionPath, data);
 			const collection = resolved !== null && Array.isArray(resolved.value) ? resolved.value : [];
 
 			while (el.firstChild !== null) el.removeChild(el.firstChild);
@@ -399,7 +401,7 @@ const buildIterate = (el: Element, loopExpr: string): Operation => {
 			for (const item of collection) {
 				const context = { ...data, [varName]: item };
 
-				for (const operation of subOperations) operation.apply(context);
+				for (const binding of subBindings) binding.apply(context);
 
 				el.appendChild(template.cloneNode(true));
 			}
@@ -408,40 +410,40 @@ const buildIterate = (el: Element, loopExpr: string): Operation => {
 };
 
 /**
- * Build the operation that shows or hides an element by condition.
+ * Build the binding that shows or hides an element by condition.
  *
  * The element's inline display value is captured at construction so a shown
  * element keeps its authored layout. A falsy condition hides the element.
  *
  * @param el - The conditioned element.
  * @param condition - The path to resolve the condition from.
- * @returns An operation that toggles the element's display.
+ * @returns A binding that toggles the element's display.
  */
-const buildRenderIf = (el: HTMLElement, condition: string): Operation => {
+const buildRenderIf = (el: HTMLElement, condition: string): Binding => {
 	const originalDisplay = el.style.display;
 
 	return {
 		path: condition,
 		apply: (data: TemplesData) => {
-			el.style.display = evalProperty(condition, data) ? originalDisplay : "none";
+			el.style.display = readProperty(condition, data) ? originalDisplay : "none";
 		}
 	};
 };
 
 /**
- * Collect every rendering operation within a root element.
+ * Collect every binding within a root element.
  *
- * Each operation targets one element: a `data-bind` applies values, a
+ * Each binding targets one element: a `data-bind` applies values, a
  * `data-render-if` shows or hides, and a `data-iterate` stamps sub-template
  * clones. Control attributes are removed so the rendered output stays clean.
- * The root itself is included when it carries a control attribute. Operations
+ * The root itself is included when it carries a control attribute. Bindings
  * are captured once, at construction time.
  *
  * @param root - The template root element.
- * @returns Array of operations, applied in document order.
+ * @returns Array of bindings, applied in document order.
  */
-const collectOperations = (root: Element): Operation[] => {
-	const operations: Operation[] = [];
+const collectBindings = (root: Element): Binding[] => {
+	const bindings: Binding[] = [];
 
 	const collect = (el: Element): void => {
 		const loopExpr = el.getAttribute("data-iterate") || el.getAttribute("data-each");
@@ -455,13 +457,13 @@ const collectOperations = (root: Element): Operation[] => {
 				if (parsed.length > 0) {
 					el.removeAttribute("data-bind");
 
-					for (const binding of parsed) operations.push(makeBinding(el, binding));
+					for (const binding of parsed) bindings.push(buildBinding(el, binding));
 				}
 			}
 
 			el.removeAttribute("data-iterate");
 			el.removeAttribute("data-each");
-			operations.push(buildIterate(el, loopExpr));
+			bindings.push(buildIterate(el, loopExpr));
 
 			return;
 		}
@@ -470,7 +472,7 @@ const collectOperations = (root: Element): Operation[] => {
 
 		if (condition) {
 			el.removeAttribute("data-render-if");
-			operations.push(buildRenderIf(el as HTMLElement, condition));
+			bindings.push(buildRenderIf(el as HTMLElement, condition));
 		}
 
 		const bindExpr = el.getAttribute("data-bind");
@@ -481,7 +483,7 @@ const collectOperations = (root: Element): Operation[] => {
 			if (parsed.length > 0) {
 				el.removeAttribute("data-bind");
 
-				for (const binding of parsed) operations.push(makeBinding(el, binding));
+				for (const binding of parsed) bindings.push(buildBinding(el, binding));
 			}
 		}
 
@@ -490,31 +492,31 @@ const collectOperations = (root: Element): Operation[] => {
 
 	collect(root);
 
-	return operations;
+	return bindings;
 };
 
 /**
- * Normalise a render input into a nested data dictionary.
+ * Normalise render data into a nested data dictionary.
  *
  * A flat delta uses dotted keys, e.g. `{ "article.title": "New" }`; each key
  * is written as a nested path. A nested dictionary is rebuilt with its
  * top-level values kept by reference. Blank keys are skipped.
  *
- * @param input - A data dictionary or a flat dotted-path delta.
+ * @param data - A data dictionary or a flat dotted-path delta.
  * @returns A nested dictionary.
  */
-const normalize = (input: TemplesData): TemplesData => {
-	const data: TemplesData = {};
+const normalize = (data: TemplesData): TemplesData => {
+	const result: TemplesData = {};
 
-	for (const [key, value] of Object.entries(input)) {
+	for (const [key, value] of Object.entries(data)) {
 		const path = key.trim();
 
 		if (path.length === 0) continue;
 
-		setPath(data, path, value);
+		setProperty(result, path, value);
 	}
 
-	return data;
+	return result;
 };
 
 /**
@@ -551,24 +553,24 @@ const enumeratePaths = (data: TemplesData): string[] => {
 /**
  * Standalone, DOM-based renderer for a single template.
  *
- * Parses the template source once into a DOM element, indexes every operation
+ * Parses the template source once into a DOM element, indexes every binding
  * by its data path, and renders only the paths present in each render call.
  */
 export class Renderer {
 	readonly root: Element;
-	private readonly byPath: Map<string, Operation[]>;
+	private readonly byPath: Map<string, Binding[]>;
 
 	constructor(source: Element | string) {
 		this.root = toElement(source);
 		this.byPath = new Map();
 
-		for (const operation of collectOperations(this.root)) {
-			const list = this.byPath.get(operation.path);
+		for (const binding of collectBindings(this.root)) {
+			const list = this.byPath.get(binding.path);
 
 			if (list !== undefined) {
-				list.push(operation);
+				list.push(binding);
 			} else {
-				this.byPath.set(operation.path, [operation]);
+				this.byPath.set(binding.path, [binding]);
 			}
 		}
 	}
@@ -576,21 +578,20 @@ export class Renderer {
 	/**
 	 * Render the paths present in the provided data.
 	 *
-	 * Every dotted path in the data is resolved, and the operations bound to
-	 * that exact path are applied. Paths absent from the data keep their
-	 * current state. A flat delta such as `{ "article.title": "New" }`
-	 * re-renders only that binding, while a full dictionary re-renders every
-	 * present path.
+	 * Every dotted path in the data is resolved, and the bindings for that
+	 * exact path are applied. Paths absent from the data keep their current
+	 * state. A flat delta such as `{ "article.title": "New" }` re-renders only
+	 * that binding, while a full dictionary re-renders every present path.
 	 *
-	 * @param input - Data dictionary or flat dotted-path delta.
+	 * @param data - Data dictionary or flat dotted-path delta.
 	 * @returns The rendered root element.
 	 */
-	render(input: TemplesData): Element {
-		const data = normalize(input);
+	render(data: TemplesData): Element {
+		const normalized = normalize(data);
 
-		for (const path of enumeratePaths(data)) {
-			for (const operation of this.byPath.get(path) ?? []) {
-				operation.apply(data);
+		for (const path of enumeratePaths(normalized)) {
+			for (const binding of this.byPath.get(path) ?? []) {
+				binding.apply(normalized);
 			}
 		}
 

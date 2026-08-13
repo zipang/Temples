@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { evalProperty, Renderer, type TemplesData } from "./engine";
+import { Renderer, readProperty, type TemplesData } from "./engine";
 
-describe("evalProperty", () => {
+describe("readProperty", () => {
 	test("resolves a simple property", () => {
-		expect(evalProperty("title", { title: "Hello" })).toBe("Hello");
+		expect(readProperty("title", { title: "Hello" })).toBe("Hello");
 	});
 
 	test("resolves a dotted path", () => {
-		expect(evalProperty("author.name", { author: { name: "Vince" } })).toBe("Vince");
+		expect(readProperty("author.name", { author: { name: "Vince" } })).toBe("Vince");
 	});
 
-	test("calls a function value with the parent object as this", () => {
+	test("calls a function value with its owner object as this", () => {
 		const data = {
 			author: {
 				firstName: "Vince",
@@ -21,29 +21,29 @@ describe("evalProperty", () => {
 			}
 		};
 
-		expect(evalProperty("author.fullName", data)).toBe("Vince Voe");
+		expect(readProperty("author.fullName", data)).toBe("Vince Voe");
 	});
 
 	test("returns empty string when the path does not resolve", () => {
-		expect(evalProperty("article.missing", { article: { title: "x" } })).toBe("");
+		expect(readProperty("article.missing", { article: { title: "x" } })).toBe("");
 	});
 
 	test("returns empty string when the root data has no such key", () => {
-		expect(evalProperty("nope", {})).toBe("");
+		expect(readProperty("nope", {})).toBe("");
 	});
 
 	test("preserves the number zero instead of coercing it to empty string", () => {
-		expect(evalProperty("count", { count: 0 })).toBe(0);
+		expect(readProperty("count", { count: 0 })).toBe(0);
 	});
 
 	test("preserves the boolean false instead of coercing it to empty string", () => {
-		expect(evalProperty("active", { active: false })).toBe(false);
+		expect(readProperty("active", { active: false })).toBe(false);
 	});
 
 	test("returns empty string when a function value returns undefined", () => {
 		const data = { fn: () => undefined } as unknown as TemplesData;
 
-		expect(evalProperty("fn", data)).toBe("");
+		expect(readProperty("fn", data)).toBe("");
 	});
 });
 
@@ -103,7 +103,7 @@ describe("Renderer", () => {
 		expect(renderer.root.textContent).toBe("Vince");
 	});
 
-	test("calls a function value during render with the parent as this", () => {
+	test("calls a function value during render with its owner as this", () => {
 		const renderer = new Renderer("<h1 data-bind='text=author.fullName'></h1>");
 		const data = {
 			author: {
@@ -433,7 +433,7 @@ describe("Renderer data-render-if", () => {
 		expect((renderer.root as HTMLElement).style.display).toBe("none");
 	});
 
-	test("calls a function condition with the parent object as this", () => {
+	test("calls a function condition with its owner object as this", () => {
 		const renderer = new Renderer("<div data-render-if='article.popular'>popular</div>");
 
 		renderer.render({
