@@ -189,7 +189,7 @@ describe("Renderer", () => {
 	});
 });
 
-describe("Renderer data-bind typed bindings (T3)", () => {
+describe("Renderer data-bind typed bindings", () => {
 	test("binds multiple attributes from a comma-separated data-bind", () => {
 		const renderer = new Renderer("<img data-bind='src=user.avatar, title=user.fullname' />");
 
@@ -271,5 +271,103 @@ describe("Renderer data-bind typed bindings (T3)", () => {
 		renderer.render({ user: { bio: "A short bio" } });
 
 		expect((renderer.root as HTMLTextAreaElement).value).toBe("A short bio");
+	});
+});
+
+describe("Renderer data-iterate", () => {
+	test("clones the first child once per item with the explicit variable", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["One", "Two", "Three"] } });
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items.length).toBe(3);
+		expect(items[0]?.textContent).toBe("One");
+		expect(items[1]?.textContent).toBe("Two");
+		expect(items[2]?.textContent).toBe("Three");
+	});
+
+	test("auto-names the variable from the collection path by dropping the final s", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='article.tags'><li><a data-bind='tag.label, href=tag.url'>tag</a></li></ul>"
+		);
+
+		renderer.render({
+			article: {
+				tags: [
+					{ label: "Temples", url: "/temples" },
+					{ label: "Binding", url: "/binding" }
+				]
+			}
+		});
+
+		const links = renderer.root.querySelectorAll("a");
+
+		expect(links.length).toBe(2);
+		expect(links[0]?.textContent).toBe("Temples");
+		expect(links[0]?.getAttribute("href")).toBe("/temples");
+		expect(links[1]?.textContent).toBe("Binding");
+	});
+
+	test("binds item properties inside the sub-template", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote.author'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: [{ author: "A" }, { author: "B" }] } });
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items[0]?.textContent).toBe("A");
+		expect(items[1]?.textContent).toBe("B");
+	});
+
+	test("renders no items for an empty collection", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: [] } });
+
+		expect(renderer.root.querySelectorAll("li").length).toBe(0);
+	});
+
+	test("re-renders when the collection changes", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["A", "B", "C"] } });
+		expect(renderer.root.querySelectorAll("li").length).toBe(3);
+
+		renderer.render({ article: { quotes: ["X"] } });
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items.length).toBe(1);
+		expect(items[0]?.textContent).toBe("X");
+	});
+
+	test("keeps the container's own data-bind", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes' data-bind='class=article.kind'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { kind: "recent", quotes: ["A"] } });
+
+		expect(renderer.root.classList.contains("recent")).toBe(true);
+		expect(renderer.root.querySelectorAll("li").length).toBe(1);
+	});
+
+	test("removes the data-iterate attribute and detaches the sub-template after construction", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		expect(renderer.root.hasAttribute("data-iterate")).toBe(false);
+		expect(renderer.root.querySelector("li")).toBeNull();
 	});
 });
