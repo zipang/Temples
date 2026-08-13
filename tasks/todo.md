@@ -7,7 +7,7 @@ Follow `test-driven-development` for each task: failing test first, then impleme
 
 ## Phase 1: Foundation
 
-- [ ] **T1: Project tooling setup**
+- [x] **T1: Project tooling setup**
   - Acceptance: `package.json` has working `dev`, `test`, `typecheck`, `demo` scripts. The `exports` map lists `./engine`, `./ssr`, and `./jquery` entry points (files may be empty stubs). `bun test` runs (even with 0 tests). `bun run typecheck` passes with no errors.
   - Verify: `bun test` and `bun run typecheck` both exit 0.
   - Files: `package.json`, `tsconfig.json` (if adjustments needed)

@@ -92,10 +92,54 @@ The reference implementation demonstrating all features:
 - `example/index.html` — demo page.
 
 ### 8. Project tooling
-- `package.json` `exports` map with `sideEffects` flags for tree-shaking.
-- Scripts: `dev`, `test`, `lint`, `typecheck`, `demo`.
-- Bun test setup (`*.test.ts` files alongside source).
-- Type checking via `tsc --noEmit`.
+
+**Source and output layout**
+- TypeScript sources live in `src/`. Tests (`*.test.ts`) sit alongside their source file.
+- The root `index.ts` is the package's main entry source (aggregates the public API). The root `index.ts` is a source file, not a build artifact.
+- The build compiles the sources into `dist/` as ready-to-use JavaScript. `dist/` is gitignored and never committed.
+
+**Build process (decision)**
+- Build tool: `bun build` (not `tsc` — `tsc` is typecheck-only with `noEmit: true`).
+- The build script runs three steps in order:
+  1. `tsc --noEmit` — fail the build on type errors.
+  2. Browser-targeted build for the main entry, the engine, and the jQuery plugin:
+     `bun build index.ts src/engine.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming "[name].[ext]"`
+  3. Node-targeted build for the SSR entry (linkedom):
+     `bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming "[name].[ext]"`
+- `--packages external` keeps `jquery` and `linkedom` as runtime imports instead of bundling them. This keeps the browser bundle clean and satisfies the jQuery peer-dependency contract.
+- `--entry-naming "[name].[ext]"` flattens the output. Without it, `bun build` preserves the entry's `src/` directory, producing `dist/src/engine.js`. The flag makes every entry land directly in `dist/`.
+- The output files are `dist/index.js`, `dist/engine.js`, `dist/ssr.js`, `dist/jquery.js`.
+
+**Exports and entry points (decision)**
+- The `exports` map points to the built `.js` files in `dist/`, never to TypeScript sources:
+  - `.` → `./dist/index.js`
+  - `./engine` → `./dist/engine.js`
+  - `./ssr` → `./dist/ssr.js`
+  - `./jquery` → `./dist/jquery.js`
+- `main` and `module` both point to `./dist/index.js` as a fallback for legacy tooling.
+- Separate subpath entries make tree-shaking work: importing `temples` never pulls in linkedom or jQuery.
+
+**Type declarations (decision — deferred)**
+- `bun build` does not emit `.d.ts` files (Bun docs: "The Bun bundler is not intended to replace `tsc` for typechecking or generating type declarations").
+- The exports are JavaScript-only for now. Generating publishable declarations is a follow-up before release and requires switching source imports to extensionless paths so `tsc` can emit clean `.d.ts`.
+
+**Test setup (decision)**
+- `bun test` is scoped to `src/` via `bunfig.toml`:
+  ```toml
+  [test]
+  root = "src"
+  ```
+- Tests import source modules by relative path (`./engine` style), never by package name.
+
+**Scripts**
+- `dev` — `bun --hot example/index.html`
+- `test` — `bun test`
+- `lint` — `biome lint .`
+- `format` / `format:check` — Biome format in place / check-only
+- `check` — `biome check .`
+- `typecheck` — `tsc --noEmit`
+- `build` — typecheck then the two `bun build` steps above
+- `demo` — `bun example/index.html`
 
 ## Implementation Order
 
@@ -160,9 +204,9 @@ Resolved during the plan review:
 3. **Component SSR** (RESOLVED — not included) — `TemplesComponent` stays browser-only. The standalone engine covers the SSG use case.
 4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Temples` and `Renderer`.
 5. **`update()` semantics** (RESOLVED) — The engine uses the original `{ path: value }` map form. The component keeps the `(path, value)` pair as a convenience wrapper.
+6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
 
 Still open:
 
-6. **Attribute value types** — HTML attributes are always strings. How should non-string values (arrays, objects, numbers, booleans) be handled? Options: JSON-encoded attributes, comma-separated arrays, or a component-level `parseAttribute(name, value)` hook. Default assumption: string values, component enriches `this.data` via internal logic.
-7. **Import path for `TemplesComponent`** — The README uses `import { TemplesComponent } from "./Temples"`. The actual export is in `index.ts`. Should we rename `index.ts` → `Temples.ts`, or export from `index.ts` and adjust import paths? Resolve during T1.
+7. **Attribute value types** — HTML attributes are always strings. How should non-string values (arrays, objects, numbers, booleans) be handled? Options: JSON-encoded attributes, comma-separated arrays, or a component-level `parseAttribute(name, value)` hook. Default assumption: string values, component enriches `this.data` via internal logic.
 8. **`data-iterate` re-rendering** — When a collection changes, old cloned items are removed and new ones stamped. The binding map tracks iterated blocks. Resolve during T4/T5.

@@ -1,1 +1,1 @@
-export class TemplesComponent extends HTMLElement {}
+export * from "./src/engine.ts";

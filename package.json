@@ -1,13 +1,25 @@
 {
 	"name": "temples-1.0",
-	"module": "index.ts",
+	"version": "0.0.0",
 	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"exports": {
+		".": "./dist/index.js",
+		"./engine": "./dist/engine.js",
+		"./ssr": "./dist/ssr.js",
+		"./jquery": "./dist/jquery.js"
+	},
 	"scripts": {
+		"dev": "bun --hot example/index.html",
+		"test": "bun test",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"check": "biome check .",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"build": "tsc --noEmit && bun build index.ts src/engine.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\"",
+		"demo": "bun example/index.html"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.8",
@@ -15,8 +27,5 @@
 	},
 	"peerDependencies": {
 		"typescript": "^5"
-	},
-	"dependencies": {
-		"vercel": "^58.11.0"
 	}
 }
