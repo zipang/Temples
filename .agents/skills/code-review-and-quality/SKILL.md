@@ -38,6 +38,7 @@ Does the code do what it claims to do?
 Can another engineer (or agent) understand this code without the author explaining it?
 
 - Are names descriptive and consistent with project conventions? (No `temp`, `data`, `result` without context)
+- **Are any names confusing or likely to be interpreted as something they are not?** Treat misleading names as a Required finding, not a nit — see the dedicated guidance below.
 - Is the control flow straightforward (avoid nested ternaries, deep callbacks)?
 - Is the code organized logically (related code grouped, clear module boundaries)?
 - Are there any "clever" tricks that should be simplified?
@@ -47,6 +48,16 @@ Can another engineer (or agent) understand this code without the author explaini
 - Are there dead code artifacts: no-op variables (`_unused`), backwards-compat shims, or `// removed` comments?
 - **Is a new conditional bolted onto an unrelated flow?** That's a design smell, not a nit — push the logic into its own helper, state, or policy instead of tangling an existing path.
 - **Do repeated conditionals on the same shape appear?** They signal a missing model or dispatcher. A "temporary" branch is usually permanent debt.
+
+**Name confusion is a review finding, not a nit.** A name is wrong when a reader can plausibly interpret it as something it is not. Confusing names force every future reader to trace the code to discover the real meaning, and they mislead agents that reason from names. Check every identifier — variables, function names, object keys, parameters, and test fixtures (data keys, ids, element references):
+
+- **Does the name collide with a standard or domain term it is not?** A data key `body` collides with the HTML `<body>` element and reads as "element content," not "a data path whose value is a string." Reserve domain terms for what they literally are. The same applies to built-ins and framework concepts (`document`, `render`, `update`, `element`).
+- **Does the name read ambiguously in its own expression?** `text=body` has two plausible readings: is `body` the binding target or the data source? If a binding, key, or argument can be read two ways, rename it until only the intended reading remains.
+- **Does the name match the value's actual nature?** A variable holding a string should not be named as if it held an element (`body` → `greeting`). A boolean reads as a question (`isActive`), a collection as plural (`tags`), a count as a number (`length`).
+- **Does the name describe the role, not a placeholder?** Prefer what the value is *for*: `markup` for an HTML string, `title` for a heading's text. Avoid `value`, `stuff`, `body`, `thing` when a role name exists.
+- **Same name means the same thing across the change.** Reusing `data` for the data object in every test is fine only while it is always the data object. A name reused for two different meanings is two bugs waiting to happen.
+
+*Concrete example from a real review:* a test bound `text=body` and rendered `{ body: "World" }`. The key `body` collides with the HTML element, `text=body` reads as "bind the body element's text," and "World" is a nonsensical value for something named `body`. Renaming the data key to `greeting` with `{ greeting: "Hello" }` removed every reading except the intended one.
 
 ### 3. Architecture
 
@@ -158,6 +169,7 @@ Tests reveal intent and coverage:
 - Do they test behavior (not implementation details)?
 - Are edge cases covered?
 - Do tests have descriptive names?
+- Do test fixtures use names that mean what they say? Data keys, ids, and element references must follow the same no-confusion standard as production code — a confusing fixture name hides the test's intent.
 - Would the tests catch a regression if the code changed?
 ```
 
@@ -284,7 +296,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 - [ ] Tests cover the change adequately
 
 ### Readability
-- [ ] Names are clear and consistent
+- [ ] Names are clear, consistent, and not misleading (no collision with domain/standard terms, no ambiguous readings)
 - [ ] Logic is straightforward
 - [ ] No unnecessary complexity
 
@@ -331,6 +343,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 | "AI-generated code is probably fine" | AI code needs more scrutiny, not less. It's confident and plausible, even when wrong. |
 | "The tests pass, so it's good" | Tests are necessary but not sufficient. They don't catch architecture problems, security issues, or readability concerns. |
 | "The refactor makes it cleaner" | Relocating complexity isn't reducing it. If the reader still holds the same number of concepts, the structure didn't improve — look for the version where branches disappear. |
+| "It's just a variable name" | A misleading name forces every future reader to trace the code and misleads agents that reason from names. It is a Required finding, not a nit. |
 | "It's only a small addition to this file" | Small diffs still push files past a healthy size and bolt branches onto unrelated flows. Judge the resulting structure, not the diff size. |
 | "It's just a version bump" | A bump is a behavior change you didn't write. Read the changelog; semver doesn't guarantee no breakage. |
 | "I'll upgrade everything in one PR to save time" | A bulk bump that breaks the build hides which package did it. One dependency per change keeps the cause and the revert clean. |
@@ -346,6 +359,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 - Review comments without severity labels — makes it unclear what's required vs optional
 - Accepting "I'll fix it later" — it never happens
 - A refactor that moves code around without reducing the number of concepts a reader must hold
+- Names that collide with domain or standard terms, or read ambiguously in their own expression (`text=body`)
 - A change that grows an already-large file instead of decomposing it
 - New conditionals scattered into unrelated code paths (a missing abstraction)
 - A bespoke helper that duplicates an existing canonical one, or feature logic placed in a shared module
