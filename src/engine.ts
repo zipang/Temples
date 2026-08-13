@@ -375,6 +375,26 @@ const buildIterate = (el: Element, loopExpr: string): Operation => {
 };
 
 /**
+ * Build the operation that shows or hides an element by condition.
+ *
+ * The element's inline display value is captured at construction so a shown
+ * element keeps its authored layout. A falsy condition hides the element.
+ *
+ * @param el - The conditioned element.
+ * @param condition - The path to resolve the condition from.
+ * @returns An operation that toggles the element's display.
+ */
+const buildRenderIf = (el: HTMLElement, condition: string): Operation => {
+	const originalDisplay = el.style.display;
+
+	return {
+		apply: (data: TemplesData) => {
+			el.style.display = evalProperty(condition, data) ? originalDisplay : "none";
+		}
+	};
+};
+
+/**
  * Collect every rendering operation within a root element.
  *
  * Each operation targets one element: a `data-bind` applies values, a
@@ -410,6 +430,13 @@ const collectOperations = (root: Element): Operation[] => {
 			operations.push(buildIterate(el, loopExpr));
 
 			return;
+		}
+
+		const condition = el.getAttribute("data-render-if");
+
+		if (condition) {
+			el.removeAttribute("data-render-if");
+			operations.push(buildRenderIf(el as HTMLElement, condition));
 		}
 
 		const bindExpr = el.getAttribute("data-bind");

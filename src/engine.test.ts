@@ -406,3 +406,79 @@ describe("Renderer data-iterate", () => {
 		expect(renderer.root.querySelectorAll("li").length).toBe(2);
 	});
 });
+
+describe("Renderer data-render-if", () => {
+	test("shows the element when the condition is truthy", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>star</div>");
+
+		renderer.render({ article: { featured: true } });
+
+		expect((renderer.root as HTMLElement).style.display).toBe("");
+	});
+
+	test("hides the element when the condition is falsy", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>star</div>");
+
+		renderer.render({ article: { featured: false } });
+
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
+	});
+
+	test("calls a function condition with the parent object as this", () => {
+		const renderer = new Renderer("<div data-render-if='article.popular'>popular</div>");
+
+		renderer.render({
+			article: {
+				comments: ["a", "b", "c"],
+				popular() {
+					return (this.comments as string[]).length > 2;
+				}
+			}
+		});
+		expect((renderer.root as HTMLElement).style.display).toBe("");
+
+		renderer.render({ article: { comments: [], popular: () => false } });
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
+	});
+
+	test("flips visibility on re-render", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
+
+		renderer.render({ article: { featured: false } });
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
+
+		renderer.render({ article: { featured: true } });
+		expect((renderer.root as HTMLElement).style.display).toBe("");
+
+		renderer.render({ article: { featured: false } });
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
+	});
+
+	test("renders child bindings when shown", () => {
+		const renderer = new Renderer(
+			"<div data-render-if='article.featured'><h1 data-bind='text=article.title'></h1></div>"
+		);
+
+		renderer.render({ article: { featured: true, title: "Hello" } });
+
+		expect((renderer.root as HTMLElement).style.display).toBe("");
+		expect(renderer.root.querySelector("h1")?.textContent).toBe("Hello");
+	});
+
+	test("combines with data-bind on the same element", () => {
+		const renderer = new Renderer(
+			"<div data-render-if='article.featured' data-bind='text=article.title'>x</div>"
+		);
+
+		renderer.render({ article: { featured: true, title: "Hi" } });
+
+		expect(renderer.root.textContent).toBe("Hi");
+		expect((renderer.root as HTMLElement).style.display).toBe("");
+	});
+
+	test("removes the data-render-if attribute after construction", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
+
+		expect(renderer.root.hasAttribute("data-render-if")).toBe(false);
+	});
+});
