@@ -1,4 +1,4 @@
-![temples](https://raw.github.com/zipang/Temples/master/images/temples.png)
+![temples](./images/temples.png)
 
 # Synopsis
 `Temples` (templ*at*es that you won't hate) is a templating system for HTML.
