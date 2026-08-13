@@ -1,11 +1,47 @@
-# TEMPLES 1.0: DECLARATIVE HTML TEMPLATING
+# Temples: Declarative HTML Templates
 
 ![Temples logo](assets/temples-logo.png)
 
 This project is a rewriting of the original [Temples](https://github.com/zipang/Temples/tree/v0) template system based on jQuery.
 The new iteration replaces jQuery with a standard, DOM-based templating engine.
 
-The engine is available in three forms :
+## Synopsis
+
+`Temples` (templ*at*es that you won't hate) is a templating system for HTML.
+`Temples` syntax is _very_ easy to use and can be learned in 5 minutes.
+`Temples` is a declarative, DOM-based rendering engine, with a special ability for real-time and partial updates.
+_Templates_ are plain HTML blocks or fragments decorated with a few `data-bind` attributes.
+`Temples` works in the browser and on the server, with the same engine and the same templates everywhere.
+
+## Motivations
+
+I want a template system that :
+
+- is easy to use, easy to read, and predictable in its syntax.
+- won't break my pages with ugly non-HTML syntax that my IDE does not recognize.
+- is reliable, so that web designers can work on the markup and the CSS with very little chance of breaking the bindings.
+- can support real-time live updates of only the relevant data, without rendering the whole thing.
+- works seamlessly with structured data at any level of nesting.
+- is built on web platform standards, so that components stay reusable without a framework.
+
+I want to :
+
+- use genuine HTML pages, full of example text, and transform them with the addition of a few `data-bind` attributes.
+- understand how it works in 2 minutes.
+- render the same templates in the browser and on the server, for fast and SEO-friendly pages.
+
+## Features
+
+- Fully HTML5 compliant. Won't break your pages.
+- Declarative bindings with a predictable syntax.
+- Transparent rendering of structured data, with functions as computed values.
+- Real-time partial updates of only the bound values.
+- Standalone engine, free of any framework dependency.
+- Web Components made declarative through the `TemplesComponent` base class.
+- Server-side rendering (SSR) and static site generation (SSG) with [linkedom](https://github.com/WebReflection/linkedom), on Bun, Node.js, or Deno.
+- Optional jQuery plugin for jQuery-based pages.
+
+## The engine in three forms
 
 - The standalone `Temples` object for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
 - The `TemplesComponent` base class for declarative Web Components.
