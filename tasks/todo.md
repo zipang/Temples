@@ -19,7 +19,7 @@ Follow `test-driven-development` for each task: failing test first, then impleme
   - Verify: Unit test prepares the same template from an HTML string and from a DOM element, renders both with `{ title: "Hello", content: "<b>World</b>" }`, and asserts identical text and innerHTML.
   - Files: `src/engine.ts`, `src/engine.test.ts`
 
-- [ ] **T3: data-bind typed bindings + multiple + class[a|b|c]**
+- [x] **T3: data-bind typed bindings + multiple + class[a|b|c]**
   - Acceptance: `value=`, `text=`, `<attr>=` typed bindings work. Multiple bindings separated by commas work together. `class[article|quote|tweet]=article.type` toggles the matched class value and preserves other classes.
   - Verify: Unit test with `<img data-bind="src=user.avatar, title=user.name">`, `<input data-bind="value=user.name">`, and the class-toggle div — asserts attributes, value, and class list against mock data. Test a second data set for the class toggle.
   - Files: `src/engine.ts`, `src/engine.test.ts`

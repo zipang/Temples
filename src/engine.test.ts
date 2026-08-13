@@ -188,3 +188,88 @@ describe("Renderer", () => {
 		expect(fromString.root.querySelector("b")?.textContent).toBe("World");
 	});
 });
+
+describe("Renderer data-bind typed bindings (T3)", () => {
+	test("binds multiple attributes from a comma-separated data-bind", () => {
+		const renderer = new Renderer("<img data-bind='src=user.avatar, title=user.fullname' />");
+
+		renderer.render({ user: { avatar: "http://avatar.com/john", fullname: "John DOE" } });
+
+		expect(renderer.root.getAttribute("src")).toBe("http://avatar.com/john");
+		expect(renderer.root.getAttribute("title")).toBe("John DOE");
+	});
+
+	test("value= binding sets the input value", () => {
+		const renderer = new Renderer("<input data-bind='value=user.name' />");
+
+		renderer.render({ user: { name: "Jane" } });
+
+		expect((renderer.root as HTMLInputElement).value).toBe("Jane");
+	});
+
+	test("supports text and attribute bindings on one element", () => {
+		const renderer = new Renderer("<a data-bind='text=link.label, href=link.url'>placeholder</a>");
+
+		renderer.render({ link: { label: "Read more", url: "https://example.com" } });
+
+		expect(renderer.root.textContent).toBe("Read more");
+		expect(renderer.root.getAttribute("href")).toBe("https://example.com");
+	});
+
+	test("class[range]=path toggles one class value and preserves the others", () => {
+		const renderer = new Renderer(
+			"<div class='row container' data-bind='class[article|quote|tweet]=article.type'></div>"
+		);
+
+		renderer.render({ article: { type: "quote" } });
+
+		expect(renderer.root.classList.contains("quote")).toBe(true);
+		expect(renderer.root.classList.contains("article")).toBe(false);
+		expect(renderer.root.classList.contains("tweet")).toBe(false);
+		expect(renderer.root.classList.contains("row")).toBe(true);
+		expect(renderer.root.classList.contains("container")).toBe(true);
+	});
+
+	test("class toggle reacts to a second data set", () => {
+		const renderer = new Renderer(
+			"<div class='row' data-bind='class[article|quote|tweet]=article.type'></div>"
+		);
+
+		renderer.render({ article: { type: "tweet" } });
+		expect(renderer.root.classList.contains("tweet")).toBe(true);
+
+		renderer.render({ article: { type: "article" } });
+		expect(renderer.root.classList.contains("article")).toBe(true);
+		expect(renderer.root.classList.contains("tweet")).toBe(false);
+	});
+
+	test("class toggle removes the range classes when the value is out of range", () => {
+		const renderer = new Renderer(
+			"<div class='row active' data-bind='class[article|quote|tweet]=article.type'></div>"
+		);
+
+		renderer.render({ article: { type: "featured" } });
+
+		expect(renderer.root.classList.contains("article")).toBe(false);
+		expect(renderer.root.classList.contains("quote")).toBe(false);
+		expect(renderer.root.classList.contains("tweet")).toBe(false);
+		expect(renderer.root.classList.contains("row")).toBe(true);
+		expect(renderer.root.classList.contains("active")).toBe(true);
+	});
+
+	test("shorthand binding on an input defaults to value", () => {
+		const renderer = new Renderer("<input data-bind='user.name' />");
+
+		renderer.render({ user: { name: "Jane" } });
+
+		expect((renderer.root as HTMLInputElement).value).toBe("Jane");
+	});
+
+	test("shorthand binding on a textarea defaults to value", () => {
+		const renderer = new Renderer("<textarea data-bind='user.bio'></textarea>");
+
+		renderer.render({ user: { bio: "A short bio" } });
+
+		expect((renderer.root as HTMLTextAreaElement).value).toBe("A short bio");
+	});
+});

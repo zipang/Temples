@@ -44,7 +44,7 @@ Binding Engine (inside Renderer):
 The standalone, DOM-based engine. Contains:
 - Template parsing: accept a DOM element or an HTML string, parse the string once into a container.
 - Path resolver — resolves dotted paths (`article.title`) against data, evaluates function values.
-- `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax. The shorthand (no `=`) defaults to `text=` semantics for non-input elements (a deliberate, safer deviation from the original v0, which defaulted to `html=`). The input→value shorthand arrives with `value=` in T3.
+- `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax. The shorthand (no `=`) defaults to `text=` semantics for non-input elements (a deliberate, safer deviation from the original v0, which defaulted to `html=`) and to `value=` semantics on form controls (INPUT, TEXTAREA, SELECT).
 - `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template.
 - `data-render-if` handler — boolean conditional show/hide.
 - `render(data)` — full binding walk and apply.
@@ -205,7 +205,7 @@ Resolved during the plan review:
 4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Temples` and `Renderer`.
 5. **`update()` semantics** (RESOLVED) — The engine uses the original `{ path: value }` map form. The component keeps the `(path, value)` pair as a convenience wrapper.
 6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
-7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. The input→value shorthand is deferred to T3 with `value=`.
+7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. On form controls (INPUT, TEXTAREA, SELECT) the shorthand defaults to `value=`. Implemented in T3.
 
 Still open:
 
