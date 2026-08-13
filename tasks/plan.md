@@ -40,11 +40,11 @@ Binding Engine (inside Renderer):
 
 ## Module Breakdown
 
-### 1. Core engine — `Renderer` (`src/renderer.ts`)
+### 1. Core engine — `Renderer` (`src/engine.ts`)
 The standalone, DOM-based engine. Contains:
 - Template parsing: accept a DOM element or an HTML string, parse the string once into a container.
 - Path resolver — resolves dotted paths (`article.title`) against data, evaluates function values.
-- `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax.
+- `data-bind` handler — typed bindings (`value=`, `text=`, `html=`, `<attr>=`), shorthand, multiple bindings, special `class[a|b|c]` syntax. The shorthand (no `=`) defaults to `text=` semantics for non-input elements (a deliberate, safer deviation from the original v0, which defaulted to `html=`). The input→value shorthand arrives with `value=` in T3.
 - `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template.
 - `data-render-if` handler — boolean conditional show/hide.
 - `render(data)` — full binding walk and apply.
@@ -150,7 +150,7 @@ Phase 1: Foundation
   T1: Project tooling (scripts, exports map skeleton)
 
 Phase 2: Core engine (DOM-based, browser)
-  T2: Renderer skeleton + template sources (element | string) + data-bind text/html + shorthand
+  T2: Renderer skeleton + template sources (element | string) + data-bind text/html + shorthand (defaults to text)
   T3: data-bind typed bindings + multiple + class[a|b|c]
   T4: data-iterate (all variants) + data-render-if
   T5: update({path: value}) partial re-render via binding map
@@ -205,6 +205,7 @@ Resolved during the plan review:
 4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Temples` and `Renderer`.
 5. **`update()` semantics** (RESOLVED) — The engine uses the original `{ path: value }` map form. The component keeps the `(path, value)` pair as a convenience wrapper.
 6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
+7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. The input→value shorthand is deferred to T3 with `value=`.
 
 Still open:
 

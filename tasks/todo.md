@@ -14,25 +14,25 @@ Follow `test-driven-development` for each task: failing test first, then impleme
 
 ## Phase 2: Core Engine
 
-- [ ] **T2: Renderer skeleton + template sources + basic data-bind**
-  - Acceptance: `new Renderer(source)` accepts a DOM element, an HTML string, or a `#id` selector. The string form is parsed once into a container. `render(data)` walks `data-bind` elements and sets text content for bare paths and innerHTML for `html=`. Shorthand omission works (text for divs, value for inputs).
+- [x] **T2: Renderer skeleton + template sources + basic data-bind**
+  - Acceptance: `new Renderer(source)` accepts a DOM element or an HTML string. The string form is parsed once into a container. `render(data)` walks `data-bind` elements and sets text content for bare paths (shorthand) and innerHTML for `html=`. Shorthand defaults to text for non-input elements; the input→value shorthand arrives in T3 with `value=`. The `#id` selector form is handled by the `Temples` registry in T6.
   - Verify: Unit test prepares the same template from an HTML string and from a DOM element, renders both with `{ title: "Hello", content: "<b>World</b>" }`, and asserts identical text and innerHTML.
-  - Files: `src/renderer.ts`, `renderer.test.ts`
+  - Files: `src/engine.ts`, `src/engine.test.ts`
 
 - [ ] **T3: data-bind typed bindings + multiple + class[a|b|c]**
   - Acceptance: `value=`, `text=`, `<attr>=` typed bindings work. Multiple bindings separated by commas work together. `class[article|quote|tweet]=article.type` toggles the matched class value and preserves other classes.
   - Verify: Unit test with `<img data-bind="src=user.avatar, title=user.name">`, `<input data-bind="value=user.name">`, and the class-toggle div — asserts attributes, value, and class list against mock data. Test a second data set for the class toggle.
-  - Files: `src/renderer.ts`, `renderer.test.ts`
+  - Files: `src/engine.ts`, `src/engine.test.ts`
 
 - [ ] **T4: data-iterate + data-render-if**
   - Acceptance: `data-iterate="quote: article.quotes"` clones the first child per item, binding `quote`. Auto-naming drops trailing `s` (`article.tags` → `tag`). `data-each` and `from` variants work. `data-render-if` shows/hides based on a truthy condition; function values are called.
   - Verify: Unit test with a 3-item array asserts 3 cloned children with correct bound values, for all syntax variants. Two `data-render-if` elements, one truthy, one falsy.
-  - Files: `src/renderer.ts`, `renderer.test.ts`
+  - Files: `src/engine.ts`, `src/engine.test.ts`
 
 - [ ] **T5: update({path: value}) partial re-render**
   - Acceptance: `renderer.update({ "article.title": "New" })` patches the data and re-renders only the bindings for those paths. An internal binding map (path → element) gives O(1) lookup.
   - Verify: Unit test with multiple bindings — update one path, assert only that element changes.
-  - Files: `src/renderer.ts`, `renderer.test.ts`
+  - Files: `src/engine.ts`, `src/engine.test.ts`
 
 - [ ] **T6: Temples registry + toHtml()/renderToString()**
   - Acceptance: `Temples.prepare(name, source)` registers a template. `Temples.render(name, data)` returns the template DOM. `Temples.renderToString(name, data)` returns serialized HTML. `Temples.update(name, partial)` and `Temples.destroy(name)` work. `register` is a synonym for `prepare`. `Renderer#toHtml()` matches `renderToString()`.
