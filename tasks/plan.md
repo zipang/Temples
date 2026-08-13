@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-Temples 1.0 is a declarative templating engine for HTML. It is a rewriting of the original [Temples](https://github.com/zipang/Temples) template system, with jQuery replaced by a standard, DOM-based engine.
+Temples 1.0 is a declarative templating engine for HTML. It is a rewriting of the original [Temples](https://github.com/zipang/Temples/tree/v0) template system, with jQuery replaced by a standard, DOM-based engine.
 
 The core is a standalone, DOM-based engine that three consumer surfaces share :
 

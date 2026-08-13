@@ -1,6 +1,8 @@
 # TEMPLES 1.0: DECLARATIVE HTML TEMPLATING
 
-This project is a rewriting of the original [Temples](https://github.com/zipang/Temples) template system based on jQuery.
+![Temples logo](assets/temples-logo.png)
+
+This project is a rewriting of the original [Temples](https://github.com/zipang/Temples/tree/v0) template system based on jQuery.
 The new iteration replaces jQuery with a standard, DOM-based templating engine.
 
 The engine is available in three forms :
