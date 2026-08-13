@@ -1,0 +1,20 @@
+# dependencies
+node_modules
+
+# build output
+dist
+out
+
+# TypeScript
+*.tsbuildinfo
+
+# packaged
+*.tgz
+
+# test coverage
+coverage
+*.lcov
+
+# environment
+.env
+.env.*.local
