@@ -72,6 +72,15 @@ Does the change fit the system's design?
 - **Is feature-specific logic leaking into a shared or general-purpose module?** Keep logic in its owning layer, reuse the existing canonical helper instead of a near-duplicate, and don't normalize architectural drift.
 - **Are type boundaries explicit?** Question gratuitous `any`/`unknown`/optional/casts and silent fallbacks that paper over an unclear invariant — making the boundary explicit often makes the surrounding control flow simpler.
 
+**Lazy typing is a review finding, not a nit.** `unknown` and `any` widen a contract to "any value is acceptable here," pushing every downstream assumption onto the caller. Accept them only where a value genuinely is untyped — at a system boundary (parsed JSON, external input, a generic schema-less data root). Where the function's purpose constrains what the value can be, name that constraint in the type. Check every `unknown` and `any`:
+
+- **Does the function's purpose constrain the value?** A resolver that feeds DOM text, attributes, or input values cannot meaningfully produce an object or a function — its return type should be a scalar union (`string | number | boolean`), not `unknown`.
+- **Is the widening necessary, or just lazy?** If every caller narrows or coerces the same way (`String(x)`, `as X`), that shared assumption belongs in the function signature, not in each caller.
+- **Justify or drop it.** The author must be able to state the boundary that makes `unknown` necessary, and the justification belongs in the JSDoc. If the answer is "it's easier this way," name a concrete union instead.
+- **Boundaries stay wide; the rest does not.** `data: unknown` on a render entry point is fine because user data has no schema. `unknown` on an internal resolver's *output* is not — the resolver knows what it can produce.
+
+For writing-time TypeScript guidance, see `typescript-best-practices`.
+
 ### 4. Security
 
 For detailed security guidance, see `security-and-hardening`. Does the change introduce vulnerabilities?
@@ -306,6 +315,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 - [ ] Appropriate abstraction level
 - [ ] Refactors reduce complexity rather than relocate it
 - [ ] No feature logic in shared modules; file stays within a healthy size
+- [ ] No lazy `unknown`/`any` — every occurrence is justified by a system boundary (JSDoc states it)
 
 ### Security
 - [ ] No secrets in code
@@ -344,6 +354,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 | "The tests pass, so it's good" | Tests are necessary but not sufficient. They don't catch architecture problems, security issues, or readability concerns. |
 | "The refactor makes it cleaner" | Relocating complexity isn't reducing it. If the reader still holds the same number of concepts, the structure didn't improve — look for the version where branches disappear. |
 | "It's just a variable name" | A misleading name forces every future reader to trace the code and misleads agents that reason from names. It is a Required finding, not a nit. |
+| "It's typed as `unknown`, so it's safe" | `unknown` shifts every narrowing decision to each caller and hides the real contract. If the function's purpose constrains the value, name a concrete union. |
 | "It's only a small addition to this file" | Small diffs still push files past a healthy size and bolt branches onto unrelated flows. Judge the resulting structure, not the diff size. |
 | "It's just a version bump" | A bump is a behavior change you didn't write. Read the changelog; semver doesn't guarantee no breakage. |
 | "I'll upgrade everything in one PR to save time" | A bulk bump that breaks the build hides which package did it. One dependency per change keeps the cause and the revert clean. |
@@ -360,6 +371,7 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 - Accepting "I'll fix it later" — it never happens
 - A refactor that moves code around without reducing the number of concepts a reader must hold
 - Names that collide with domain or standard terms, or read ambiguously in their own expression (`text=body`)
+- Lazy `unknown`/`any` on a return type where the function's purpose constrains the value
 - A change that grows an already-large file instead of decomposing it
 - New conditionals scattered into unrelated code paths (a missing abstraction)
 - A bespoke helper that duplicates an existing canonical one, or feature logic placed in a shared module

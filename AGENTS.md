@@ -27,10 +27,12 @@ Task arrives
     │   ├── Need better context? ──────────→ context-engineering
     │   ├── Need doc-verified code? ───────→ source-driven-development
     │   ├── Stakes high / unfamiliar code? → doubt-driven-development
+    │   ├── Writing TypeScript? ───────────→ typescript-best-practices
     │   └── JS/TS tooling? ────────────────→ use-bun
     ├── Writing/running tests? ─────────────→ test-driven-development
     │   └── Testing/debugging real web app pages? → agent-browser
     ├── Reviewing code? ───────────────────→ code-review-and-quality
+    │   ├── Lazy typing? ──────────────────→ typescript-best-practices
     │   └── Too complex? ──────────────────→ code-simplification
     ├── Writing docs, instructions or comments? → technical-writing
 ```
@@ -64,6 +66,7 @@ These behaviors apply at all times, across all skills. They are non-negotiable. 
 | Build | `source-driven-development` | Verify against official docs before implementing |
 | Build | `doubt-driven-development` | Adversarial fresh-context review of non-trivial decisions |
 | Build | `context-engineering` | Right context at the right time |
+| Build | `typescript-best-practices` | Strict, honest TypeScript types — no lazy `unknown`/`any`/casts |
 | Tooling | `use-bun` | Use Bun instead of Node.js tooling |
 | Verify | `test-driven-development` | Failing test first, then make it pass |
 | Verify | `agent-browser` | Test/debug real web pages & components in a browser |
