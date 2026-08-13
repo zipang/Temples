@@ -74,14 +74,18 @@ export const evalProperty = (path: string, data: TemplesData): RenderValue => {
 };
 
 /**
- * Normalise a template source into a DOM element.
+ * Give the renderer one stable root element to bind against and re-render.
  *
- * An HTML string is parsed once into a container element and the first
- * element child is returned as the template root. A DOM element is returned
- * unchanged.
+ * An HTML string is a fragment, not an element: it can contain several
+ * sibling elements or only text, so it has no single element identity. The
+ * challenge is to collapse any fragment to one element. Parsing inside a
+ * throwaway container does that: the first element child becomes the root,
+ * and the container is discarded. A bare container is returned only when the
+ * fragment yields no element at all. A DOM element source is already a root
+ * and is returned unchanged.
  *
  * @param source - DOM element or HTML string.
- * @returns The element to use as the renderer root.
+ * @returns A single element usable as the template root.
  */
 const toElement = (source: Element | string): Element => {
 	if (typeof source === "string") {
