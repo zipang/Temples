@@ -320,7 +320,7 @@ const makeBinding = (el: Element, parsed: ParsedBinding): Operation => ({
  * @returns The variable name and the collection path.
  */
 const parseLoop = (loopExpr: string): { varName: string; seed: string } => {
-	const match = /^\s*(.*?)\s*:\s*(.*)$/.exec(loopExpr);
+	const match = /^\s*(.*?)\s*(?::|from)\s*(.*)$/.exec(loopExpr);
 
 	if (match !== null && (match[2] ?? "").length > 0) {
 		return { varName: match[1] ?? "", seed: match[2] ?? "" };

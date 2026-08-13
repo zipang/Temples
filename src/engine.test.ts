@@ -370,4 +370,39 @@ describe("Renderer data-iterate", () => {
 		expect(renderer.root.hasAttribute("data-iterate")).toBe(false);
 		expect(renderer.root.querySelector("li")).toBeNull();
 	});
+
+	test("supports the from keyword instead of the colon", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote from article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["One", "Two"] } });
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items.length).toBe(2);
+		expect(items[0]?.textContent).toBe("One");
+		expect(items[1]?.textContent).toBe("Two");
+	});
+
+	test("data-each is a synonym for data-iterate", () => {
+		const renderer = new Renderer(
+			"<ul data-each='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["Only"] } });
+
+		expect(renderer.root.querySelectorAll("li").length).toBe(1);
+		expect(renderer.root.querySelector("li")?.textContent).toBe("Only");
+	});
+
+	test("combines data-each with the from keyword", () => {
+		const renderer = new Renderer(
+			"<ul data-each='quote from article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["A", "B"] } });
+
+		expect(renderer.root.querySelectorAll("li").length).toBe(2);
+	});
 });
