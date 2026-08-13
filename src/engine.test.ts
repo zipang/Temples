@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { evalProperty, Renderer } from "./engine";
+import { evalProperty, Renderer, type TemplesData } from "./engine";
 
 describe("evalProperty", () => {
 	test("resolves a simple property", () => {
@@ -41,7 +41,7 @@ describe("evalProperty", () => {
 	});
 
 	test("returns empty string when a function value returns undefined", () => {
-		const data = { fn: () => undefined };
+		const data = { fn: () => undefined } as unknown as TemplesData;
 
 		expect(evalProperty("fn", data)).toBe("");
 	});

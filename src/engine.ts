@@ -1,35 +1,76 @@
 /**
- * Resolve a dotted property path against a data object.
+ * Value that flows from data into a rendered DOM node.
  *
- * When the final value is a function, it is called with its parent object as
- * `this` so methods can reference sibling properties. A path that does not
- * resolve returns an empty string. Falsy values such as `0` and `false` are
- * preserved; only `null` and `undefined` collapse to an empty string.
+ * Text content, attributes, and input values are all scalar: strings,
+ * numbers, and booleans. Objects and functions are not meaningful rendered
+ * values, so the resolver contract excludes them.
+ */
+export type RenderValue = string | number | boolean;
+
+/**
+ * The recursive dictionary shape that Temples renders against.
+ *
+ * Every key is a string. Every value is a scalar, a parameterless function
+ * that returns a scalar, or another dictionary of the same shape. Declared as
+ * an interface so the recursive reference resolves without a circular-alias
+ * error.
+ */
+export interface TemplesData {
+	[key: string]: TemplesDataValue;
+}
+
+/**
+ * A value held in a Temples data dictionary.
+ *
+ * A leaf is a scalar (`RenderValue`) or a parameterless function returning a
+ * scalar. The function is called with its parent dictionary as `this`, so
+ * methods can reference sibling properties. A non-leaf is a nested
+ * dictionary.
+ */
+export type TemplesDataValue = RenderValue | ((this: TemplesData) => RenderValue) | TemplesData;
+
+/**
+ * Resolve a dotted property path against a Temples data dictionary.
+ *
+ * Intermediate steps must be dictionaries. A leaf is a scalar or a
+ * parameterless function: the function is called with its parent dictionary
+ * as `this` and its result is used. A function that returns `null` or
+ * `undefined` yields an empty string. Falsy scalars such as `0` and `false`
+ * are preserved; only `null` and `undefined` collapse to an empty string. A
+ * path that resolves to a dictionary yields an empty string.
  *
  * @param path - Dotted path, e.g. `"article.author.name"`.
- * @param data - Root data object to resolve the path against.
- * @returns Resolved value, function result, or empty string when missing.
+ * @param data - Root data dictionary to resolve the path against.
+ * @returns Resolved scalar value, function result, or empty string when missing.
  */
-export const evalProperty = (path: string, data: unknown): unknown => {
+export const evalProperty = (path: string, data: TemplesData): RenderValue => {
 	const steps = (path ?? "").trim().split(".");
 
-	let current = data;
-	let parent: unknown;
+	let current: TemplesDataValue | undefined = data;
+	let parent: TemplesData = data;
 
 	for (const step of steps) {
 		if (current == null) return "";
 
+		if (typeof current !== "object") return "";
+
 		parent = current;
-		current = (current as Record<string, unknown>)[step];
+		current = current[step];
 	}
 
+	if (current == null) return "";
+
 	if (typeof current === "function") {
-		const result = (current as (...args: unknown[]) => unknown).call(parent);
+		const result: RenderValue | null | undefined = current.call(parent);
 
 		return result == null ? "" : result;
 	}
 
-	return current == null ? "" : current;
+	if (typeof current === "string" || typeof current === "number" || typeof current === "boolean") {
+		return current;
+	}
+
+	return "";
 };
 
 /**
@@ -81,7 +122,7 @@ const parseBinding = (expr: string): ParsedBinding => {
 	return null;
 };
 
-type Binding = { apply: (data: unknown) => void };
+type Binding = { apply: (data: TemplesData) => void };
 
 /**
  * Build the closure that applies one binding to its element during render.
@@ -91,7 +132,7 @@ type Binding = { apply: (data: unknown) => void };
  * @returns A binding record carrying the apply function.
  */
 const makeBinding = (el: Element, parsed: { kind: BindingKind; path: string }): Binding => ({
-	apply: (data: unknown) => {
+	apply: (data: TemplesData) => {
 		const value = String(evalProperty(parsed.path, data));
 
 		if (parsed.kind === "text") el.textContent = value;
@@ -144,10 +185,10 @@ export class Renderer {
 	/**
 	 * Apply every binding to the template with the provided data.
 	 *
-	 * @param data - Data object to resolve binding paths against.
+	 * @param data - Data dictionary to resolve binding paths against.
 	 * @returns The rendered root element.
 	 */
-	render(data: unknown): Element {
+	render(data: TemplesData): Element {
 		for (const binding of this.bindings) {
 			binding.apply(data);
 		}
