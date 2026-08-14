@@ -195,15 +195,25 @@ Temples.prepare("logged-user", '<div><span data-bind="user.firstname">John</span
 
 Renders the registered template with the data and returns the updated template DOM.
 `render` touches only the paths present in `data`; absent paths keep their current state.
-Pass a full dictionary to render everything, or a flat dotted-path object to update a single path in real time.
+Pass a full dictionary to render everything, or a partial dictionary to re-render only the paths it carries.
 The returned DOM lets you insert, clone, or serialize the result.
 
 ```javascript
 const result = Temples.render("logged-user", user);
 document.body.appendChild(result);
+```
 
+To update a single path in real time, use `Temples.update` instead (see below).
+
+### `Temples.update(name, propertyPath, value)`
+
+Updates a single path of the registered template and re-renders only the binding for that exact path.
+The path is a dotted path such as `"user.status"`.
+This enables efficient real-time partial updates without re-rendering the whole template.
+
+```javascript
 // Real-time partial update of one path only
-Temples.render("logged-user", { "user.status": "away" });
+Temples.update("logged-user", "user.status", "away");
 ```
 
 ### `Temples.renderToString(name, data)`
@@ -240,7 +250,7 @@ import { Renderer } from "temples";
 
 const renderer = new Renderer(templateElementOrString);
 renderer.render(data); // renders the paths present in data
-renderer.render({ "user.name": "Jane" }); // re-render only that path
+renderer.update("user.name", "Jane"); // re-render only that path
 const html = renderer.renderToString(); // serialized HTML
 renderer.destroy();
 ```
@@ -476,7 +486,7 @@ Delegates to the shared `Renderer` engine (see [Standalone template engine](#sta
 Patches a single path in `this.data` (e.g. `"article.title"`) and re-renders only the affected binding.
 Enables efficient partial updates without re-rendering the entire component.
 Accessible from event handlers and internal component logic, but **internal to the component**.
-Delegates to the shared engine's `render()` with a flat dotted-path delta.
+Delegates to the shared engine's `update()` method.
 
 ### Public methods (user-defined)
 

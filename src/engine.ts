@@ -1,3 +1,5 @@
+import { getProperty, setProperty } from "./utilities/properties";
+
 /**
  * Value that flows from data into a rendered DOM node.
  *
@@ -32,105 +34,6 @@ export type TemplesDataValue =
 	| ((this: TemplesData) => RenderValue)
 	| TemplesData
 	| TemplesDataValue[];
-
-/**
- * A reference to a property located by its path: the property's value and the
- * dictionary that owns it.
- */
-type PropertyRef = { value: TemplesDataValue | undefined; owner: TemplesData };
-
-/**
- * Find the property at a dotted path in a Temples data dictionary.
- *
- * The path is followed through the dictionary. Intermediate steps must be
- * dictionaries; a path that crosses a scalar, an array, or a missing value
- * does not reach a property. The final step may hold any value, including an
- * array or a function.
- *
- * @param path - Dotted path to the property, e.g. `"article.author.name"`.
- * @param data - Root data dictionary to read the path from.
- * @returns The property's value with its owner, or null when the path stops early.
- */
-const findProperty = (path: string, data: TemplesData): PropertyRef | null => {
-	const steps = (path ?? "").trim().split(".");
-
-	let current: TemplesDataValue | undefined = data;
-	let owner: TemplesData = data;
-
-	for (const step of steps) {
-		if (current == null || typeof current !== "object" || Array.isArray(current)) return null;
-
-		owner = current;
-		current = current[step];
-	}
-
-	return { value: current, owner };
-};
-
-/**
- * Read the property at a dotted path in a Temples data dictionary.
- *
- * The path is followed to the property. A leaf property is a scalar or a
- * parameterless function: the function is called with its owner dictionary
- * as `this` and its result is used. A function that returns `null` or
- * `undefined` yields an empty string. Falsy scalars such as `0` and `false`
- * are preserved; only `null` and `undefined` collapse to an empty string. A
- * path that reaches a dictionary or an array yields an empty string.
- *
- * @param path - Dotted path to the property, e.g. `"article.author.name"`.
- * @param data - Root data dictionary to read from.
- * @returns The property's scalar value, function result, or empty string when missing.
- */
-export const readProperty = (path: string, data: TemplesData): RenderValue => {
-	const resolved = findProperty(path, data);
-
-	if (resolved === null || resolved.value == null) return "";
-
-	const { value, owner } = resolved;
-
-	if (typeof value === "function") {
-		const result: RenderValue | null | undefined = value.call(owner);
-
-		return result == null ? "" : result;
-	}
-
-	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-		return value;
-	}
-
-	return "";
-};
-
-/**
- * Set the property at a dotted path, creating missing intermediate dictionaries.
- *
- * The path is followed into the dictionary; an intermediate that is not a
- * dictionary is replaced by an empty one. A dotted path locates a nested
- * property directly, e.g. `"article.title"`.
- *
- * @param data - The dictionary holding the property.
- * @param path - Dotted path to the property, e.g. `"article.title"`.
- * @param value - The value to assign to the property.
- */
-const setProperty = (data: TemplesData, path: string, value: TemplesDataValue): void => {
-	const parts = path.split(".");
-	const last = parts.pop();
-
-	if (last === undefined) return;
-
-	let current: TemplesData = data;
-
-	for (const part of parts) {
-		const next = current[part];
-		const branch: TemplesData =
-			next != null && typeof next === "object" && !Array.isArray(next) ? next : {};
-
-		current[part] = branch;
-		current = branch;
-	}
-
-	current[last] = value;
-};
 
 /**
  * Give the renderer one stable root element to bind against and re-render.
@@ -321,7 +224,12 @@ type Binding = { path: string; apply: (data: TemplesData) => void };
 const buildBinding = (el: Element, parsed: ParsedBinding): Binding => ({
 	path: parsed.path,
 	apply: (data: TemplesData) => {
-		const value = String(readProperty(parsed.path, data));
+		const raw = getProperty(data, parsed.path, "");
+
+		const value =
+			typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean"
+				? String(raw)
+				: "";
 
 		switch (parsed.kind) {
 			case "text":
@@ -393,8 +301,8 @@ const buildIterate = (el: Element, loopExpr: string): Binding => {
 	return {
 		path: collectionPath,
 		apply: (data: TemplesData) => {
-			const resolved = findProperty(collectionPath, data);
-			const collection = resolved !== null && Array.isArray(resolved.value) ? resolved.value : [];
+			const value = getProperty<unknown>(data, collectionPath, null);
+			const collection = Array.isArray(value) ? (value as TemplesDataValue[]) : [];
 
 			while (el.firstChild !== null) el.removeChild(el.firstChild);
 
@@ -425,7 +333,7 @@ const buildRenderIf = (el: HTMLElement, condition: string): Binding => {
 	return {
 		path: condition,
 		apply: (data: TemplesData) => {
-			el.style.display = readProperty(condition, data) ? originalDisplay : "none";
+			el.style.display = getProperty(data, condition, "") ? originalDisplay : "none";
 		}
 	};
 };
@@ -496,103 +404,58 @@ const collectBindings = (root: Element): Binding[] => {
 };
 
 /**
- * Normalise render data into a nested data dictionary.
- *
- * A flat delta uses dotted keys, e.g. `{ "article.title": "New" }`; each key
- * is written as a nested path. A nested dictionary is rebuilt with its
- * top-level values kept by reference. Blank keys are skipped.
- *
- * @param data - A data dictionary or a flat dotted-path delta.
- * @returns A nested dictionary.
- */
-const normalize = (data: TemplesData): TemplesData => {
-	const result: TemplesData = {};
-
-	for (const [key, value] of Object.entries(data)) {
-		const path = key.trim();
-
-		if (path.length === 0) continue;
-
-		setProperty(result, path, value);
-	}
-
-	return result;
-};
-
-/**
- * Collect every dotted path present in a data dictionary.
- *
- * Dictionaries are walked recursively so a nested value contributes each of
- * its paths, e.g. `{ article: { title: "x" } }` yields `article` and
- * `article.title`. Arrays, functions, and scalars are leaves and do not
- * descend.
- *
- * @param data - The data dictionary to walk.
- * @returns The dotted paths, top-down in object order.
- */
-const enumeratePaths = (data: TemplesData): string[] => {
-	const paths: string[] = [];
-
-	const walk = (dict: TemplesData, prefix: string): void => {
-		for (const [key, value] of Object.entries(dict)) {
-			const path = prefix === "" ? key : `${prefix}.${key}`;
-
-			paths.push(path);
-
-			if (value != null && typeof value === "object" && !Array.isArray(value)) {
-				walk(value, path);
-			}
-		}
-	};
-
-	walk(data, "");
-
-	return paths;
-};
-
-/**
  * Standalone, DOM-based renderer for a single template.
  *
- * Parses the template source once into a DOM element, indexes every binding
- * by its data path, and renders only the paths present in each render call.
+ * Parses the template source once into a DOM element and collects every
+ * binding. Each render call applies only the bindings whose paths resolve in
+ * the provided data.
  */
 export class Renderer {
 	readonly root: Element;
-	private readonly byPath: Map<string, Binding[]>;
+	private readonly bindings: Binding[];
 
 	constructor(source: Element | string) {
 		this.root = toElement(source);
-		this.byPath = new Map();
-
-		for (const binding of collectBindings(this.root)) {
-			const list = this.byPath.get(binding.path);
-
-			if (list !== undefined) {
-				list.push(binding);
-			} else {
-				this.byPath.set(binding.path, [binding]);
-			}
-		}
+		this.bindings = collectBindings(this.root);
 	}
 
 	/**
-	 * Render the paths present in the provided data.
+	 * Render the bindings whose paths are present in the provided data.
 	 *
-	 * Every dotted path in the data is resolved, and the bindings for that
-	 * exact path are applied. Paths absent from the data keep their current
-	 * state. A flat delta such as `{ "article.title": "New" }` re-renders only
-	 * that binding, while a full dictionary re-renders every present path.
+	 * Every binding is applied when its path resolves in the data. A path
+	 * absent from the data keeps its current state. A partial dictionary
+	 * re-renders only the paths it carries, while a full dictionary
+	 * re-renders every present path.
 	 *
-	 * @param data - Data dictionary or flat dotted-path delta.
+	 * @param data - Data dictionary; the paths it carries are rendered.
 	 * @returns The rendered root element.
 	 */
 	render(data: TemplesData): Element {
-		const normalized = normalize(data);
+		for (const binding of this.bindings) {
+			if (getProperty(data, binding.path) !== undefined) binding.apply(data);
+		}
 
-		for (const path of enumeratePaths(normalized)) {
-			for (const binding of this.byPath.get(path) ?? []) {
-				binding.apply(normalized);
-			}
+		return this.root;
+	}
+
+	/**
+	 * Update a single path and re-render only the bindings bound to it.
+	 *
+	 * The path is written into a fresh nested dictionary, e.g. `"article.title"`
+	 * yields `{ article: { title: value } }`, and only the operations bound to
+	 * that exact path are applied. All other bindings keep their current state.
+	 *
+	 * @param path - Dotted path to the property, e.g. `"article.title"`.
+	 * @param value - The value to assign to the property.
+	 * @returns The rendered root element.
+	 */
+	update(path: string, value: TemplesDataValue): Element {
+		const data: TemplesData = {};
+
+		setProperty(data, path, value);
+
+		for (const binding of this.bindings) {
+			if (binding.path === path) binding.apply(data);
 		}
 
 		return this.root;

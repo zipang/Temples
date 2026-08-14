@@ -1,51 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Renderer, readProperty, type TemplesData } from "./engine";
-
-describe("readProperty", () => {
-	test("resolves a simple property", () => {
-		expect(readProperty("title", { title: "Hello" })).toBe("Hello");
-	});
-
-	test("resolves a dotted path", () => {
-		expect(readProperty("author.name", { author: { name: "Vince" } })).toBe("Vince");
-	});
-
-	test("calls a function value with its owner object as this", () => {
-		const data = {
-			author: {
-				firstName: "Vince",
-				lastName: "Voe",
-				fullName() {
-					return `${this.firstName} ${this.lastName}`;
-				}
-			}
-		};
-
-		expect(readProperty("author.fullName", data)).toBe("Vince Voe");
-	});
-
-	test("returns empty string when the path does not resolve", () => {
-		expect(readProperty("article.missing", { article: { title: "x" } })).toBe("");
-	});
-
-	test("returns empty string when the root data has no such key", () => {
-		expect(readProperty("nope", {})).toBe("");
-	});
-
-	test("preserves the number zero instead of coercing it to empty string", () => {
-		expect(readProperty("count", { count: 0 })).toBe(0);
-	});
-
-	test("preserves the boolean false instead of coercing it to empty string", () => {
-		expect(readProperty("active", { active: false })).toBe(false);
-	});
-
-	test("returns empty string when a function value returns undefined", () => {
-		const data = { fn: () => undefined } as unknown as TemplesData;
-
-		expect(readProperty("fn", data)).toBe("");
-	});
-});
+import { Renderer } from "./engine";
 
 describe("Renderer", () => {
 	test("accepts an HTML string as the template source", () => {
@@ -493,19 +447,19 @@ describe("Renderer data-render-if", () => {
 });
 
 describe("Renderer partial render", () => {
-	test("renders only the paths present in a flat dotted-path delta", () => {
+	test("renders only the paths present in a partial data dictionary", () => {
 		const renderer = new Renderer(
 			"<article><h1 data-bind='text=article.title'></h1><p data-bind='text=article.body'></p></article>"
 		);
 
 		renderer.render({ article: { title: "Old", body: "Body" } });
-		renderer.render({ "article.title": "New" });
+		renderer.render({ article: { title: "New" } });
 
 		expect(renderer.root.querySelector("h1")?.textContent).toBe("New");
 		expect(renderer.root.querySelector("p")?.textContent).toBe("Body");
 	});
 
-	test("keeps every binding when the delta carries no matching path", () => {
+	test("keeps every binding when the data carries no matching path", () => {
 		const renderer = new Renderer("<h1 data-bind='text=title'>initial</h1>");
 
 		renderer.render({ title: "Hello" });
@@ -514,13 +468,13 @@ describe("Renderer partial render", () => {
 		expect(renderer.root.textContent).toBe("Hello");
 	});
 
-	test("re-stamps an iterate when its collection path is in the delta", () => {
+	test("re-stamps an iterate when its collection path is in the data", () => {
 		const renderer = new Renderer(
 			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
 		);
 
 		renderer.render({ article: { quotes: ["A", "B"] } });
-		renderer.render({ "article.quotes": ["X", "Y", "Z"] });
+		renderer.render({ article: { quotes: ["X", "Y", "Z"] } });
 
 		const items = renderer.root.querySelectorAll("li");
 
@@ -539,12 +493,63 @@ describe("Renderer partial render", () => {
 		expect(renderer.root.querySelectorAll("li").length).toBe(2);
 	});
 
-	test("re-evaluates a render-if when its condition path is in the delta", () => {
+	test("re-evaluates a render-if when its condition path is in the data", () => {
 		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
 
 		renderer.render({ article: { featured: true } });
-		renderer.render({ "article.featured": false });
+		renderer.render({ article: { featured: false } });
 
 		expect((renderer.root as HTMLElement).style.display).toBe("none");
+	});
+
+	test("does not interpret a flat dotted key as a nested path", () => {
+		const renderer = new Renderer("<h1 data-bind='text=article.title'></h1>");
+
+		renderer.render({ article: { title: "Hello World!" }, "article.title": "Nope" });
+
+		expect(renderer.root.textContent).toBe("Hello World!");
+	});
+});
+
+describe("Renderer update", () => {
+	test("updates only the binding for the exact path", () => {
+		const renderer = new Renderer(
+			"<article><h1 data-bind='text=article.title'></h1><p data-bind='text=article.body'></p></article>"
+		);
+
+		renderer.render({ article: { title: "Old", body: "Body" } });
+		renderer.update("article.title", "New");
+
+		expect(renderer.root.querySelector("h1")?.textContent).toBe("New");
+		expect(renderer.root.querySelector("p")?.textContent).toBe("Body");
+	});
+
+	test("re-stamps an iterate when its collection path is updated", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
+		);
+
+		renderer.render({ article: { quotes: ["A", "B"] } });
+		renderer.update("article.quotes", ["X", "Y", "Z"]);
+
+		const items = renderer.root.querySelectorAll("li");
+
+		expect(items.length).toBe(3);
+		expect(items[0]?.textContent).toBe("X");
+	});
+
+	test("re-evaluates a render-if when its condition path is updated", () => {
+		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
+
+		renderer.render({ article: { featured: true } });
+		renderer.update("article.featured", false);
+
+		expect((renderer.root as HTMLElement).style.display).toBe("none");
+	});
+
+	test("update returns the root element", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'></h1>");
+
+		expect(renderer.update("title", "x")).toBe(renderer.root);
 	});
 });
