@@ -3,6 +3,8 @@ import { parseHTML } from "linkedom";
 const dom = parseHTML("<!doctype html><html><head></head><body></body></html>");
 
 const globals = {
+	window: dom.window,
+	location: { href: "http://localhost/" },
 	document: dom.document,
 	Document: dom.Document,
 	DocumentFragment: dom.DocumentFragment,
