@@ -460,4 +460,28 @@ export class Renderer {
 
 		return this.root;
 	}
+
+	/**
+	 * Serialize the rendered root to an HTML string.
+	 *
+	 * The root element is the template root, so its outer HTML carries every
+	 * rendered binding. Control attributes were removed at construction, so the
+	 * markup stays clean.
+	 *
+	 * @returns The serialized HTML of the root element.
+	 */
+	toHtml(): string {
+		return this.root.outerHTML;
+	}
+
+	/**
+	 * Serialize the rendered root to an HTML string.
+	 *
+	 * Synonym for `toHtml()`.
+	 *
+	 * @returns The serialized HTML of the root element.
+	 */
+	renderToString(): string {
+		return this.toHtml();
+	}
 }

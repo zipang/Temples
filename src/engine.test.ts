@@ -553,3 +553,31 @@ describe("Renderer update", () => {
 		expect(renderer.update("title", "x")).toBe(renderer.root);
 	});
 });
+
+describe("Renderer serialization", () => {
+	test("toHtml() returns the serialized HTML of the rendered root", () => {
+		const renderer = new Renderer(
+			"<article><h1 data-bind='text=article.title'></h1><p data-bind='text=article.body'>body</p></article>"
+		);
+
+		renderer.render({ article: { title: "Hello", body: "World" } });
+
+		expect(renderer.toHtml()).toBe("<article><h1>Hello</h1><p>World</p></article>");
+	});
+
+	test("renderToString() is a synonym for toHtml()", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>old</h1>");
+
+		renderer.render({ title: "New" });
+
+		expect(renderer.renderToString()).toBe(renderer.toHtml());
+	});
+
+	test("toHtml() reflects the control attributes removed at construction", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>old</h1>");
+
+		renderer.render({ title: "New" });
+
+		expect(renderer.toHtml()).toBe("<h1>New</h1>");
+	});
+});
