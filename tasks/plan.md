@@ -6,29 +6,25 @@ Temples 1.0 is a declarative templating engine for HTML. It is a rewriting of th
 
 The core is a standalone, DOM-based engine that three consumer surfaces share :
 
-- The `Temples` object with `prepare()` / `render()` / `renderToString()` for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
+- The `Renderer` class for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
 - The `TemplesComponent` base class for Web Components.
 - The jQuery plugin export (`temples/jquery`).
+
+The v0 name-based `Temples` registry (`prepare()`, `register()`, `render(name, ...)`, `renderToString(name, ...)`, `destroy(name)`) is **deprecated and removed**. It stored Renderer instances by name, and a forgotten `destroy(name)` left zombie templates. Direct `Renderer` instances are owned by the caller, so no registry and no `destroy()` are needed. Re-evaluate this decision when the rest of the API is complete.
 
 ```
 Standalone engine (DOM-based, shared):
   ┌────────────────────────────────────────────────────────────┐
   │  Renderer (per template)                                   │
-  │    template source: DOM element | HTML string | #id        │
+  │    template source: DOM element | HTML string              │
   │    render(data)   → render only the paths present in data  │
   │    toHtml() / renderToString() → serialized HTML           │
-  │    destroy()                                              │
-  │                                                            │
-  │  Temples registry                                          │
-  │    prepare(name, source) / register(...)                   │
-  │    render(name, data) / renderToString(name, data)         │
-  │    destroy(name)                                           │
   └────────────────────────────────────────────────────────────┘
 
 Consumers:
-  TemplesComponent (browser)      Temples / Renderer (direct)     jQuery plugin
-    lifecycle hooks                 Temples.renderToString           $.fn.temples(data)
-    engine over its own root        SSR via ./ssr entry              jQuery peer dep
+  TemplesComponent (browser)      Renderer (direct)              jQuery plugin
+    lifecycle hooks                 Renderer.renderToString        $.fn.temples(data)
+    engine over its own root        SSR via ./ssr entry           jQuery peer dep
 
 Binding Engine (inside Renderer):
   → resolve data paths (dotted notation) against data
@@ -47,15 +43,11 @@ The standalone, DOM-based engine. Contains:
 - `data-iterate` handler — collection iteration, variable naming (`:` / `from` / auto), `data-each` synonym, first-child as sub-template. Implemented in T4.
 - `data-render-if` handler — boolean conditional show/hide. Implemented in T4.
 - `render(data)` — renders only the paths present in the data, via the internal path → operation map (O(1) lookup). `update(path, value)` re-renders only the binding for that exact path. Implemented in T5.
-- `toHtml()` / `renderToString()` — serialized HTML of the rendered template.
-- `destroy()` — release bindings (fights zombie templates).
+- `toHtml()` / `renderToString()` — serialized HTML of the rendered template. Implemented in T6.
+- No `destroy()` — the caller owns the renderer and releases it by dropping the reference.
 
-### 2. `Temples` registry (`src/temples.ts`)
-The static API, faithful to the original:
-- `prepare(name, source)` and `register(name, source)` (synonym) — `source` is a DOM element, an HTML string, or a `#id` selector (browser only).
-- `render(name, data)` — returns the updated template DOM.
-- `renderToString(name, data)` — returns the serialized HTML string.
-- `destroy(name)` — release the registered renderer.
+### 2. v0 `Temples` registry — removed
+The v0 name-based `Temples` registry (`prepare(name, source)` / `register(...)`, `render(name, data)`, `renderToString(name, data)`, `update(name, path, value)`, `destroy(name)`) is **deprecated and removed**. Storing Renderer instances by name invites zombie templates when `destroy(name)` is forgotten. The caller holds a `Renderer` directly instead. Re-evaluate when the other API pieces are complete.
 
 ### 3. `TemplesComponent` base class (`index.ts`)
 A thin consumer of the core engine. Contains:
@@ -65,12 +57,12 @@ A thin consumer of the core engine. Contains:
 - `update(path, value)` (internal) — convenience wrapper that re-renders one path through `render({ path: value })`.
 - `this.data` (private) — aggregated state from attributes.
 
-The component's `render()` and `update()` stay internal to the component. The same binding engine is public through the `Temples` object and the `Renderer` class.
+The component's `render()` and `update()` stay internal to the component. The same binding engine is public through the `Renderer` class.
 
 ### 4. SSR entry (`src/ssr.ts`)
 Wires the engine to linkedom so string templates parse and serialize on the server without a browser.
 - Export path: `temples/ssr`.
-- Enables `Temples.prepare(name, htmlString)` and `Temples.renderToString(name, data)` on the server.
+- Enables `new Renderer(htmlString)` and `renderer.renderToString()` on the server.
 - The main entry must not statically import linkedom, so browser bundles stay clean.
 
 ### 5. jQuery plugin (`src/jquery.ts`)
@@ -151,10 +143,10 @@ Phase 2: Core engine (DOM-based, browser)
   T3: data-bind typed bindings + multiple + class[a|b|c]
   T4: data-iterate (all variants) + data-render-if
   T5: render(data) renders only the paths present in the data
-  T6: Temples registry + toHtml()/renderToString()
-
+  T6: Renderer toHtml()/renderToString() (serialization)
+ 
 Phase 3: SSR
-  T7: ./ssr entry — linkedom wiring; prepare(string) + renderToString on the server
+  T7: ./ssr entry — linkedom wiring; new Renderer(htmlString) + renderToString on the server
 
 Phase 4: Web Component
   T8: TemplesComponent skeleton + define() + template cloning + engine-backed render
@@ -196,16 +188,17 @@ After each phase, verify before proceeding:
 
 Resolved during the plan review:
 
-1. **Engine encapsulation** (RESOLVED) — The binding engine is a standalone `Renderer` / `Temples` module, shared by the web component, direct use, and the jQuery plugin.
+1. **Engine encapsulation** (RESOLVED) — The binding engine is a standalone `Renderer` module, shared by the web component, direct use, and the jQuery plugin.
 2. **Server DOM strategy** (RESOLVED) — Single DOM-based engine. The `./ssr` entry wires linkedom for server-side rendering. `renderToString` works in the browser and on the server.
 3. **Component SSR** (RESOLVED — not included) — `TemplesComponent` stays browser-only. The standalone engine covers the SSG use case.
-4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Temples` and `Renderer`.
+4. **`render()` / `update()` visibility** (RESOLVED) — The component's `render()` / `update()` stay internal to the component and delegate to the engine. The engine is public through `Renderer`.
 5. **`update()` semantics** (RESOLVED — T5) — The engine originally planned a `{ path: value }` partial update. T5 first replaced it with a unified `render(data)`, then restored `update(path, value)` when a flat dotted-path delta (`{ "article.title": "New" }`) proved too dangerous — dotted keys in data are treated as literal keys, not nested paths, and a mixed flat/expanded object is meaningless. Single-path updates go through `update(path, value)`, which re-renders only the binding for that exact path.
 6. **Import path for `TemplesComponent`** (RESOLVED) — The root `index.ts` is the package's main entry and the build result is `dist/index.js`. The README's `import { TemplesComponent } from "./Temples"` maps to the package main entry. Keep `index.ts`; consumers import from the package root.
 7. **Shorthand binding default** (RESOLVED) — The `data-bind` shorthand (no `=`) defaults to `text=` semantics for non-input elements, not the original v0 `html=` default. This is a deliberate safety improvement: the common case renders plain text, and `html=` stays explicit for markup. On form controls (INPUT, TEXTAREA, SELECT) the shorthand defaults to `value=`. Implemented in T3.
 8. **Iterate context** (RESOLVED — T4) — `data-iterate` renders each item with the variable merged into a shallow copy of the data dictionary, so the caller's data object is never mutated (v0 wrote the item into the data object in place). The sub-template is the container's first element child, detached at construction and re-stamped per item.
 9. **`data-render-if` hiding** (RESOLVED — T4) — A falsy condition hides the element with `display: none`; the authored inline `display` value is restored when the condition turns truthy. This replaces v0's placeholder-comment removal, a jQuery `replaceWith` technique.
 10. **Unified render** (RESOLVED — T5) — `render(data)` is the rendering method for dictionaries: it resolves every dotted path present in the data and applies only the operations bound to that exact path; absent paths keep their current state. Single-path updates go through `update(path, value)`, which re-renders only the binding for that exact path. A flat dotted-path delta is NOT supported — `render()` treats dotted keys as literal keys. The binding map is path → operation, giving O(1) lookup. The DOM is the state; the renderer retains no data between calls.
+11. **v0 `Temples` registry** (RESOLVED — deprecated) — The v0 name-based registry (`prepare()` / `register()`, `render(name, ...)`, `renderToString(name, ...)`, `update(name, ...)`, `destroy(name)`) is deprecated and removed. Storing Renderer instances by name invites zombie templates when `destroy(name)` is forgotten. Direct `Renderer` instances are caller-owned, so no registry, no `#id` selector source, and no `destroy()` are needed. Re-evaluate when the other API pieces are complete.
 
 Still open:
 

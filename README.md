@@ -43,7 +43,7 @@ I want to :
 
 ## The engine in three forms
 
-- The standalone `Temples` object for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
+- The standalone `Renderer` class for direct use in the browser and for server-side rendering (SSR) in Bun, Node.js, or Deno.
 - The `TemplesComponent` base class for declarative Web Components.
 - A jQuery plugin (`temples/jquery`) that renders data into matched elements.
 
@@ -172,90 +172,70 @@ The test can be done against a function in the data if needed :
 ## STANDALONE TEMPLATE ENGINE
 
 The binding engine is a standalone module. It does not depend on the Web Component lifecycle.
-You can use it directly with the `Temples` object, or build your own renderer with the `Renderer` class.
+Build a renderer with the `Renderer` class.
 
-### `Temples.prepare(name, source)`
+> The v0 name-based `Temples` registry (`prepare()`, `render(name, ...)`, `update(name, ...)`, `renderToString(name, ...)`, `destroy(name)`) is **deprecated**. It stored Renderer instances by name, and a forgotten `destroy(name)` left zombie templates. Direct `Renderer` instances are owned by the caller, so no registry and no `destroy()` are needed.
 
-Registers a template under a name and returns a compiled `Renderer`.
-The source can be :
+### The `Renderer` class
+
+The template source can be :
 
 - an HTML string with the full template content.
 - a DOM element.
-- a selector that starts with `#` (browser only).
 
 ```javascript
-Temples.prepare("logged-user", "#logged-user"); // DOM id
-Temples.prepare("logged-user", document.getElementById("logged-user")); // DOM element
-Temples.prepare("logged-user", '<div><span data-bind="user.firstname">John</span></div>'); // HTML string
+const renderer = new Renderer(document.getElementById("logged-user")); // DOM element
+const renderer = new Renderer('<div><span data-bind="user.firstname">John</span></div>'); // HTML string
 ```
 
-`register` is a synonym for `prepare`.
+### `render(data)`
 
-### `Temples.render(name, data)`
-
-Renders the registered template with the data and returns the updated template DOM.
+Renders the template with the data and returns the updated template DOM.
 `render` touches only the paths present in `data`; absent paths keep their current state.
 Pass a full dictionary to render everything, or a partial dictionary to re-render only the paths it carries.
 The returned DOM lets you insert, clone, or serialize the result.
 
 ```javascript
-const result = Temples.render("logged-user", user);
+const renderer = new Renderer(document.getElementById("logged-user"));
+const result = renderer.render(user);
 document.body.appendChild(result);
 ```
 
-To update a single path in real time, use `Temples.update` instead (see below).
+To update a single path in real time, use `update` instead (see below).
 
-### `Temples.update(name, propertyPath, value)`
+### `update(propertyPath, value)`
 
-Updates a single path of the registered template and re-renders only the binding for that exact path.
+Updates a single path and re-renders only the binding for that exact path.
 The path is a dotted path such as `"user.status"`.
 This enables efficient real-time partial updates without re-rendering the whole template.
 
 ```javascript
 // Real-time partial update of one path only
-Temples.update("logged-user", "user.status", "away");
+renderer.update("user.status", "away");
 ```
 
-### `Temples.renderToString(name, data)`
+### `toHtml()` / `renderToString()`
 
-Renders the registered template with the data and returns the serialized HTML string.
+Returns the serialized HTML of the rendered template.
+`renderToString()` is a synonym for `toHtml()`.
 This method is the entry point for server-side rendering (SSR) and static site generation (SSG).
 
 ```javascript
-import { Temples } from "temples";
+import { Renderer } from "temples";
 import "temples/ssr";
 
-Temples.prepare("article", articleTemplateMarkup);
-
-const html = Temples.renderToString("article", {
+const renderer = new Renderer(articleTemplateMarkup);
+renderer.render({
   article: {
     title: "The Great Race",
     quotes: ["Quiet!", "Pardon me Mr Partner."]
   }
 });
 
+const html = renderer.renderToString();
+
 // Write the HTML string to a file with your runtime file API (Bun, Node.js, Deno).
 ```
-
-### `Temples.destroy(name)`
-
-Releases a registered template and frees all bound elements.
-
-### The `Renderer` class
-
-You can build a renderer without a registry :
-
-```javascript
-import { Renderer } from "temples";
-
-const renderer = new Renderer(templateElementOrString);
-renderer.render(data); // renders the paths present in data
-renderer.update("user.name", "Jane"); // re-render only that path
-const html = renderer.renderToString(); // serialized HTML
-renderer.destroy();
-```
-
-`toHtml()` is a synonym for `renderToString()`.
 
 ### Server-side rendering
 
@@ -375,7 +355,7 @@ The internal rendering pipeline :
 These methods are **internal to the component**.
 External code must not call `render(data)` to arbitrarily overwrite component state.
 The current attribute values are the source of truth that dictates the component state.
-The same binding engine is public through the `Temples` object and the `Renderer` class (see [Standalone template engine](#standalone-template-engine)).
+The same binding engine is public through the `Renderer` class (see [Standalone template engine](#standalone-template-engine)).
 
 To change a component's state, use either :
 

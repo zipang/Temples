@@ -15,7 +15,7 @@ Follow `test-driven-development` for each task: failing test first, then impleme
 ## Phase 2: Core Engine
 
 - [x] **T2: Renderer skeleton + template sources + basic data-bind**
-  - Acceptance: `new Renderer(source)` accepts a DOM element or an HTML string. The string form is parsed once into a container. `render(data)` walks `data-bind` elements and sets text content for bare paths (shorthand) and innerHTML for `html=`. Shorthand defaults to text for non-input elements; the input→value shorthand arrives in T3 with `value=`. The `#id` selector form is handled by the `Temples` registry in T6.
+  - Acceptance: `new Renderer(source)` accepts a DOM element or an HTML string. The string form is parsed once into a container. `render(data)` walks `data-bind` elements and sets text content for bare paths (shorthand) and innerHTML for `html=`. Shorthand defaults to text for non-input elements; the input→value shorthand arrives in T3 with `value=`. There is no `#id` selector form (deprecated with the `Temples` registry).
   - Verify: Unit test prepares the same template from an HTML string and from a DOM element, renders both with `{ title: "Hello", content: "<b>World</b>" }`, and asserts identical text and innerHTML.
   - Files: `src/engine.ts`, `src/engine.test.ts`
 
@@ -36,16 +36,16 @@ Follow `test-driven-development` for each task: failing test first, then impleme
   - Files: `src/engine.ts`, `src/engine.test.ts`, `README.md`
   - Notes: A flat dotted-path delta (`{ "article.title": "New" }`) is NOT supported — `render()` treats dotted keys as literal keys, not nested paths. Single-path updates go through `update(path, value)`. The DOM is the state; no data is retained between calls. Bindings inside an iterated sub-template are not individually updatable; the iterate re-stamp refreshes them.
 
-- [ ] **T6: Temples registry + toHtml()/renderToString()**
-  - Acceptance: `Temples.prepare(name, source)` registers a template. `Temples.render(name, data)` returns the template DOM (a partial dictionary re-renders only the paths it carries). `Temples.update(name, path, value)` re-renders one path. `Temples.renderToString(name, data)` returns serialized HTML. `Temples.destroy(name)` works. `register` is a synonym for `prepare`. `Renderer#toHtml()` matches `renderToString()`.
-  - Verify: Unit test registers a template by name, renders data, asserts the returned DOM and the serialized string match expected markup.
-  - Files: `src/temples.ts`, `temples.test.ts`
+- [ ] **T6: Renderer toHtml()/renderToString() serialization**
+  - Acceptance: `Renderer#toHtml()` returns the serialized HTML of the rendered root. `renderToString()` is a synonym for `toHtml()`. There is no `Temples` registry and no `destroy()` (the v0 name-based registry is deprecated and removed).
+  - Verify: Unit test renders a template from an HTML string and a DOM element, and asserts the serialized output matches expected markup.
+  - Files: `src/engine.ts`, `src/engine.test.ts`
 
 ## Phase 3: SSR
 
 - [ ] **T7: ./ssr entry — linkedom wiring**
-  - Acceptance: Importing `temples/ssr` sets up a linkedom-backed DOM so `Temples.prepare(name, htmlString)` and `Temples.renderToString(name, data)` work on the server without a browser. The main entry does not statically import linkedom.
-  - Verify: Unit test run on the server prepares a template from an HTML string and asserts `renderToString` output matches the browser path on the same template and data. Round-trip test for entities and void tags.
+  - Acceptance: Importing `temples/ssr` sets up a linkedom-backed DOM so `new Renderer(htmlString)` renders and `renderer.renderToString()` serializes on the server without a browser. The main entry does not statically import linkedom.
+  - Verify: Unit test run on the server creates a Renderer from an HTML string and asserts `renderToString` output matches the browser path on the same template and data. Round-trip test for entities and void tags.
   - Files: `src/ssr.ts`, `ssr.test.ts`
 
 ## Phase 4: Web Component
