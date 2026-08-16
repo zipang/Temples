@@ -1,4 +1,4 @@
-import { getProperty, setProperty } from "./utilities/properties";
+import { getProperty, hasProperty, setProperty } from "./utilities/properties";
 
 /**
  * Value that flows from data into a rendered DOM node.
@@ -54,6 +54,10 @@ const toElement = (source: Element | string): Element => {
 		const container = document.createElement("div");
 		container.innerHTML = source.trim();
 
+		if (container.children.length > 1) {
+			throw new Error("Template string must have a single root element");
+		}
+
 		return container.firstElementChild ?? container;
 	}
 
@@ -104,16 +108,55 @@ const isFormControl = (el: Element): boolean => {
 /**
  * Set the `value` on a form control, or the `value` attribute otherwise.
  *
+ * SELECT is handled separately: linkedom exposes a readonly `value`, so the
+ * selected option is set through each option's `selected` property instead.
+ *
  * @param el - The target element.
  * @param value - The string value to set.
  */
 const setValue = (el: Element, value: string): void => {
+	if (el.tagName === "SELECT") {
+		for (const option of Array.from(el.querySelectorAll("option"))) {
+			const optionValue = option.getAttribute("value") ?? option.textContent ?? "";
+			(option as HTMLOptionElement).selected = optionValue === value;
+		}
+
+		return;
+	}
+
 	if (isValueControl(el)) {
 		el.value = value;
 	} else {
 		el.setAttribute("value", value);
 	}
 };
+
+/**
+ * Attribute names that are presence-based boolean attributes.
+ *
+ * For these, `setAttribute(name, "false")` would still enable the attribute,
+ * so the binding toggles the attribute by the value's truthiness instead.
+ */
+const BOOLEAN_ATTRIBUTES = new Set([
+	"checked",
+	"disabled",
+	"hidden",
+	"readonly",
+	"required",
+	"multiple",
+	"selected",
+	"autofocus",
+	"autoplay",
+	"controls",
+	"loop",
+	"muted",
+	"open",
+	"novalidate",
+	"inert",
+	"async",
+	"defer",
+	"reversed"
+]);
 
 /**
  * Apply a `class[range]=path` toggle to an element.
@@ -212,18 +255,45 @@ const parseBindings = (expr: string, el: Element): ParsedBinding[] => {
 	return bindings;
 };
 
-type Binding = { path: string; apply: (data: TemplesData) => void };
+type Binding = { path: string; apply: (data: TemplesData, root: Element) => void };
+
+/**
+ * Resolve the element at an index path from a root.
+ *
+ * Bindings are root-relative so the same binding can target the template root
+ * or any clone of it (used by `data-iterate` to re-apply values to live rows).
+ *
+ * @param root - The root element the path starts from.
+ * @param indexPath - Child indexes from the root to the target element.
+ * @returns The target element.
+ */
+const elementAt = (root: Element, indexPath: number[]): Element => {
+	let el: Element = root;
+
+	for (const i of indexPath) {
+		const child = el.children[i];
+
+		if (child === undefined) {
+			throw new Error("Binding index path is out of range");
+		}
+
+		el = child;
+	}
+
+	return el;
+};
 
 /**
  * Build the closure that applies one binding to its element during render.
  *
- * @param el - The bound DOM element.
+ * @param indexPath - Child indexes locating the bound element from the root.
  * @param parsed - The parsed binding.
  * @returns A binding that applies one `data-bind` expression during render.
  */
-const buildBinding = (el: Element, parsed: ParsedBinding): Binding => ({
+const buildBinding = (indexPath: number[], parsed: ParsedBinding): Binding => ({
 	path: parsed.path,
-	apply: (data: TemplesData) => {
+	apply: (data: TemplesData, root: Element) => {
+		const el = elementAt(root, indexPath);
 		const raw = getProperty(data, parsed.path, "");
 
 		const value =
@@ -242,7 +312,11 @@ const buildBinding = (el: Element, parsed: ParsedBinding): Binding => ({
 				setValue(el, value);
 				break;
 			case "attr":
-				el.setAttribute(parsed.attr, value);
+				if (BOOLEAN_ATTRIBUTES.has(parsed.attr)) {
+					el.toggleAttribute(parsed.attr, Boolean(raw));
+				} else {
+					el.setAttribute(parsed.attr, value);
+				}
 				break;
 			case "class":
 				applyClass(el, parsed.range, value);
@@ -252,67 +326,157 @@ const buildBinding = (el: Element, parsed: ParsedBinding): Binding => ({
 });
 
 /**
+ * Strip a trailing plural `s` from a collection name for auto-naming.
+ *
+ * The `s` is kept when the word ends in `ss`, `us`, or `is`, which are not
+ * plural markers (`address`, `status`, `analysis`). All other trailing `s`
+ * characters are removed (`tags` → `tag`, `quotes` → `quote`).
+ *
+ * @param word - The collection name.
+ * @returns The singularized name.
+ */
+const singularize = (word: string): string => {
+	if (word.length > 1 && word.endsWith("s") && !/(ss|us|is)$/.test(word)) {
+		return word.slice(0, -1);
+	}
+
+	return word;
+};
+
+/**
  * Parse a `data-iterate` expression into a variable name and a collection path.
  *
  * Supported forms: `path` (the variable name is derived from the collection
- * path), `name: path`, and `name from path`. Auto-naming keeps the last path
- * segment without its trailing `s` characters.
+ * path), `name: path`, and `name from path`. The `from` keyword is recognized
+ * only as a standalone word, so a path segment named `from`
+ * (`messages.from.user`) is left intact. Auto-naming keeps the last path
+ * segment and strips only a plural `s`.
  *
  * @param loopExpr - The `data-iterate` or `data-each` attribute value.
  * @returns The variable name and the collection path.
  */
 const parseLoop = (loopExpr: string): { varName: string; collectionPath: string } => {
-	const match = /^\s*(.*?)\s*(?::|from)\s*(.*)$/.exec(loopExpr);
+	const trimmed = loopExpr.trim();
 
-	if (match !== null && (match[2] ?? "").length > 0) {
-		return { varName: match[1] ?? "", collectionPath: match[2] ?? "" };
+	const colon = trimmed.indexOf(":");
+
+	if (colon !== -1) {
+		const varName = trimmed.slice(0, colon).trim();
+		const collectionPath = trimmed.slice(colon + 1).trim();
+
+		if (varName.length > 0 && collectionPath.length > 0) {
+			return { varName, collectionPath };
+		}
 	}
 
-	const collectionPath = loopExpr.trim();
+	const fromMatch = /^(\S+)\s+from\s+(\S+)$/.exec(trimmed);
+
+	if (fromMatch !== null) {
+		return { varName: fromMatch[1] ?? "", collectionPath: fromMatch[2] ?? "" };
+	}
+
+	const collectionPath = trimmed;
 	const last = collectionPath.split(".").pop() ?? "";
 
-	return { varName: last.replace(/s*$/, ""), collectionPath };
+	return { varName: singularize(last), collectionPath };
+};
+
+/**
+ * Extract the reconciliation key for a collection item.
+ *
+ * The key comes from the `data-key` path when provided, otherwise from the
+ * item's `id` property. A missing key returns `null`, which disables keyed
+ * reconciliation and falls back to re-stamping.
+ *
+ * @param item - The collection item.
+ * @param keyPath - The `data-key` path relative to the item, or null.
+ * @returns The string key, or null when the item has no usable key.
+ */
+const getItemKey = (item: unknown, keyPath: string | null): string | null => {
+	if (keyPath !== null) {
+		const value = getProperty<unknown>(item as object, keyPath, null);
+
+		if (value === null || value === undefined) return null;
+
+		return String(value);
+	}
+
+	if (item !== null && typeof item === "object" && "id" in (item as object)) {
+		const id = (item as Record<string, unknown>).id;
+
+		if (id !== null && id !== undefined) return String(id);
+	}
+
+	return null;
 };
 
 /**
  * Build the binding that stamps one sub-template clone per collection item.
  *
  * The first child of the iterate element is the sub-template. It is detached
- * from the container at construction, its bindings are collected once, and
- * each item renders a fresh clone. Item values are exposed to the
- * sub-template under the variable name.
+ * at construction and its bindings are collected once. On render, items are
+ * reconciled by key (`data-key` or item `id`): rows that keep their key are
+ * reused in place, so input focus and scroll survive; new keys clone a fresh
+ * row and removed keys are dropped. Without keys, the list re-stamps.
  *
- * @param el - The iterate container element.
+ * @param indexPath - Child indexes locating the iterate container.
+ * @param template - The detached sub-template element.
  * @param loopExpr - The `data-iterate` or `data-each` attribute value.
- * @returns A binding that re-stamps the items on every render.
+ * @param keyPath - The `data-key` path, or null when not declared.
+ * @returns A binding that reconciles the items on every render.
  */
-const buildIterate = (el: Element, loopExpr: string): Binding => {
+const buildIterate = (
+	indexPath: number[],
+	template: Element,
+	loopExpr: string,
+	keyPath: string | null
+): Binding => {
 	const { varName, collectionPath } = parseLoop(loopExpr);
-	const template = el.firstElementChild;
-
-	if (template === null) {
-		throw new Error(`${el.tagName} data-iterate must have a child element to use as sub-template`);
-	}
-
 	const subBindings = collectBindings(template);
-
-	el.removeChild(template);
+	let rendered = new Map<string, Element>();
 
 	return {
 		path: collectionPath,
-		apply: (data: TemplesData) => {
+		apply: (data: TemplesData, root: Element) => {
+			const el = elementAt(root, indexPath);
 			const value = getProperty<unknown>(data, collectionPath, null);
 			const collection = Array.isArray(value) ? (value as TemplesDataValue[]) : [];
 
-			while (el.firstChild !== null) el.removeChild(el.firstChild);
+			const keyed = collection.map((item) => ({ key: getItemKey(item, keyPath), item }));
+			const keyable = keyed.every(({ key }) => key !== null);
 
-			for (const item of collection) {
-				const context = { ...data, [varName]: item };
+			const fragment = document.createDocumentFragment();
 
-				for (const binding of subBindings) binding.apply(context);
+			if (keyable) {
+				const next = new Map<string, Element>();
 
-				el.appendChild(template.cloneNode(true));
+				for (const { key, item } of keyed) {
+					const k = key as string;
+					const existing = rendered.get(k);
+					const node = existing ?? (template.cloneNode(true) as Element);
+					const context = { ...data, [varName]: item };
+
+					for (const binding of subBindings) binding.apply(context, node);
+
+					next.set(k, node);
+					fragment.appendChild(node);
+				}
+
+				rendered = next;
+			} else {
+				for (const item of collection) {
+					const node = template.cloneNode(true) as Element;
+					const context = { ...data, [varName]: item };
+
+					for (const binding of subBindings) binding.apply(context, node);
+
+					fragment.appendChild(node);
+				}
+
+				rendered = new Map();
 			}
+
+			el.replaceChildren(fragment);
 		}
 	};
 };
@@ -320,32 +484,31 @@ const buildIterate = (el: Element, loopExpr: string): Binding => {
 /**
  * Build the binding that shows or hides an element by condition.
  *
- * The element's inline display value is captured at construction so a shown
- * element keeps its authored layout. A falsy condition hides the element.
+ * A truthy condition clears the inline `display` (restoring the element's
+ * natural visibility, even when authored `display:none`); a falsy condition
+ * hides it with `display:none`.
  *
- * @param el - The conditioned element.
+ * @param indexPath - Child indexes locating the conditioned element.
  * @param condition - The path to resolve the condition from.
  * @returns A binding that toggles the element's display.
  */
-const buildRenderIf = (el: HTMLElement, condition: string): Binding => {
-	const originalDisplay = el.style.display;
-
-	return {
-		path: condition,
-		apply: (data: TemplesData) => {
-			el.style.display = getProperty(data, condition, "") ? originalDisplay : "none";
-		}
-	};
-};
+const buildRenderIf = (indexPath: number[], condition: string): Binding => ({
+	path: condition,
+	apply: (data: TemplesData, root: Element) => {
+		const el = elementAt(root, indexPath) as HTMLElement;
+		el.style.display = getProperty(data, condition, "") ? "" : "none";
+	}
+});
 
 /**
  * Collect every binding within a root element.
  *
  * Each binding targets one element: a `data-bind` applies values, a
- * `data-render-if` shows or hides, and a `data-iterate` stamps sub-template
+ * `data-render-if` shows or hides, and a `data-iterate` reconciles sub-template
  * clones. Control attributes are removed so the rendered output stays clean.
  * The root itself is included when it carries a control attribute. Bindings
- * are captured once, at construction time.
+ * are captured once, at construction time, and are root-relative so they can
+ * target clones.
  *
  * @param root - The template root element.
  * @returns Array of bindings, applied in document order.
@@ -353,7 +516,7 @@ const buildRenderIf = (el: HTMLElement, condition: string): Binding => {
 const collectBindings = (root: Element): Binding[] => {
 	const bindings: Binding[] = [];
 
-	const collect = (el: Element): void => {
+	const collect = (el: Element, indexPath: number[]): void => {
 		const loopExpr = el.getAttribute("data-iterate") || el.getAttribute("data-each");
 
 		if (loopExpr) {
@@ -365,13 +528,28 @@ const collectBindings = (root: Element): Binding[] => {
 				if (parsed.length > 0) {
 					el.removeAttribute("data-bind");
 
-					for (const binding of parsed) bindings.push(buildBinding(el, binding));
+					for (const binding of parsed) bindings.push(buildBinding(indexPath, binding));
 				}
 			}
 
+			const template = el.firstElementChild;
+
+			if (template === null) {
+				throw new Error(
+					`${el.tagName} data-iterate must have a child element to use as sub-template`
+				);
+			}
+
+			el.removeChild(template);
+
+			const keyPath = el.getAttribute("data-key");
+
+			if (keyPath !== null) el.removeAttribute("data-key");
+
 			el.removeAttribute("data-iterate");
 			el.removeAttribute("data-each");
-			bindings.push(buildIterate(el, loopExpr));
+
+			bindings.push(buildIterate(indexPath, template, loopExpr, keyPath));
 
 			return;
 		}
@@ -380,7 +558,7 @@ const collectBindings = (root: Element): Binding[] => {
 
 		if (condition) {
 			el.removeAttribute("data-render-if");
-			bindings.push(buildRenderIf(el as HTMLElement, condition));
+			bindings.push(buildRenderIf(indexPath, condition));
 		}
 
 		const bindExpr = el.getAttribute("data-bind");
@@ -391,14 +569,18 @@ const collectBindings = (root: Element): Binding[] => {
 			if (parsed.length > 0) {
 				el.removeAttribute("data-bind");
 
-				for (const binding of parsed) bindings.push(buildBinding(el, binding));
+				for (const binding of parsed) bindings.push(buildBinding(indexPath, binding));
 			}
 		}
 
-		for (const child of Array.from(el.children)) collect(child);
+		for (let i = 0; i < el.children.length; i++) {
+			const child = el.children[i];
+
+			if (child !== undefined) collect(child, [...indexPath, i]);
+		}
 	};
 
-	collect(root);
+	collect(root, []);
 
 	return bindings;
 };
@@ -411,12 +593,12 @@ const collectBindings = (root: Element): Binding[] => {
  * the provided data.
  */
 export class Renderer {
-	readonly root: Element;
+	readonly rootElt: Element;
 	private readonly bindings: Binding[];
 
 	constructor(source: Element | string) {
-		this.root = toElement(source);
-		this.bindings = collectBindings(this.root);
+		this.rootElt = toElement(source);
+		this.bindings = collectBindings(this.rootElt);
 	}
 
 	/**
@@ -432,10 +614,10 @@ export class Renderer {
 	 */
 	render(data: TemplesData): Element {
 		for (const binding of this.bindings) {
-			if (getProperty(data, binding.path) !== undefined) binding.apply(data);
+			if (hasProperty(data, binding.path)) binding.apply(data, this.rootElt);
 		}
 
-		return this.root;
+		return this.rootElt;
 	}
 
 	/**
@@ -455,10 +637,10 @@ export class Renderer {
 		setProperty(data, path, value);
 
 		for (const binding of this.bindings) {
-			if (binding.path === path) binding.apply(data);
+			if (binding.path === path) binding.apply(data, this.rootElt);
 		}
 
-		return this.root;
+		return this.rootElt;
 	}
 
 	/**
@@ -471,7 +653,7 @@ export class Renderer {
 	 * @returns The serialized HTML of the root element.
 	 */
 	toHtml(): string {
-		return this.root.outerHTML;
+		return this.rootElt.outerHTML;
 	}
 
 	/**

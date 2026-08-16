@@ -7,7 +7,7 @@ describe("Renderer", () => {
 
 		renderer.render({ title: "Hello" });
 
-		expect(renderer.root.textContent).toBe("Hello");
+		expect(renderer.rootElt.textContent).toBe("Hello");
 	});
 
 	test("accepts a DOM element as the template source", () => {
@@ -19,7 +19,7 @@ describe("Renderer", () => {
 
 		renderer.render({ greeting: "Hello" });
 
-		expect(renderer.root.textContent).toBe("Hello");
+		expect(renderer.rootElt.textContent).toBe("Hello");
 	});
 
 	test("text= binding sets text content and escapes HTML markup", () => {
@@ -27,8 +27,8 @@ describe("Renderer", () => {
 
 		renderer.render({ markup: "<b>bold</b>" });
 
-		expect(renderer.root.textContent).toBe("<b>bold</b>");
-		expect(renderer.root.querySelector("b")).toBeNull();
+		expect(renderer.rootElt.textContent).toBe("<b>bold</b>");
+		expect(renderer.rootElt.querySelector("b")).toBeNull();
 	});
 
 	test("html= binding sets inner HTML and parses markup", () => {
@@ -36,8 +36,8 @@ describe("Renderer", () => {
 
 		renderer.render({ markup: "<b>bold</b>" });
 
-		expect(renderer.root.innerHTML).toBe("<b>bold</b>");
-		expect(renderer.root.querySelector("b")?.textContent).toBe("bold");
+		expect(renderer.rootElt.innerHTML).toBe("<b>bold</b>");
+		expect(renderer.rootElt.querySelector("b")?.textContent).toBe("bold");
 	});
 
 	test("shorthand binding (no =) defaults to text semantics", () => {
@@ -45,8 +45,8 @@ describe("Renderer", () => {
 
 		renderer.render({ markup: "<b>bold</b>" });
 
-		expect(renderer.root.textContent).toBe("<b>bold</b>");
-		expect(renderer.root.querySelector("b")).toBeNull();
+		expect(renderer.rootElt.textContent).toBe("<b>bold</b>");
+		expect(renderer.rootElt.querySelector("b")).toBeNull();
 	});
 
 	test("resolves a dotted path during render", () => {
@@ -54,7 +54,7 @@ describe("Renderer", () => {
 
 		renderer.render({ author: { name: "Vince" } });
 
-		expect(renderer.root.textContent).toBe("Vince");
+		expect(renderer.rootElt.textContent).toBe("Vince");
 	});
 
 	test("calls a function value during render with its owner as this", () => {
@@ -71,7 +71,7 @@ describe("Renderer", () => {
 
 		renderer.render(data);
 
-		expect(renderer.root.textContent).toBe("Vince Voe");
+		expect(renderer.rootElt.textContent).toBe("Vince Voe");
 	});
 
 	test("a missing path is left untouched when the data does not carry it", () => {
@@ -79,7 +79,7 @@ describe("Renderer", () => {
 
 		renderer.render({});
 
-		expect(renderer.root.textContent).toBe("initial");
+		expect(renderer.rootElt.textContent).toBe("initial");
 	});
 
 	test("a path is cleared when the data carries an explicit empty value", () => {
@@ -88,7 +88,7 @@ describe("Renderer", () => {
 		renderer.render({ title: "Hello" });
 		renderer.render({ title: "" });
 
-		expect(renderer.root.textContent).toBe("");
+		expect(renderer.rootElt.textContent).toBe("");
 	});
 
 	test("binds the root element itself when it carries data-bind", () => {
@@ -96,7 +96,7 @@ describe("Renderer", () => {
 
 		renderer.render({ title: "new" });
 
-		expect(renderer.root.textContent).toBe("new");
+		expect(renderer.rootElt.textContent).toBe("new");
 	});
 
 	test("binds multiple nested elements in one render", () => {
@@ -106,30 +106,30 @@ describe("Renderer", () => {
 
 		renderer.render({ title: "T", body: "B" });
 
-		expect(renderer.root.querySelector("h1")?.textContent).toBe("T");
-		expect(renderer.root.querySelector("p")?.textContent).toBe("B");
+		expect(renderer.rootElt.querySelector("h1")?.textContent).toBe("T");
+		expect(renderer.rootElt.querySelector("p")?.textContent).toBe("B");
 	});
 
 	test("removes the data-bind attribute after construction", () => {
 		const renderer = new Renderer("<h1 data-bind='text=title'></h1>");
 
-		expect(renderer.root.hasAttribute("data-bind")).toBe(false);
+		expect(renderer.rootElt.hasAttribute("data-bind")).toBe(false);
 	});
 
 	test("render returns the root element", () => {
 		const renderer = new Renderer("<h1 data-bind='text=title'></h1>");
 
-		expect(renderer.render({ title: "x" })).toBe(renderer.root);
+		expect(renderer.render({ title: "x" })).toBe(renderer.rootElt);
 	});
 
 	test("render is re-runnable with different data", () => {
 		const renderer = new Renderer("<h1 data-bind='text=title'></h1>");
 
 		renderer.render({ title: "first" });
-		expect(renderer.root.textContent).toBe("first");
+		expect(renderer.rootElt.textContent).toBe("first");
 
 		renderer.render({ title: "second" });
-		expect(renderer.root.textContent).toBe("second");
+		expect(renderer.rootElt.textContent).toBe("second");
 	});
 
 	test("HTML string and DOM element sources render identically", () => {
@@ -146,9 +146,9 @@ describe("Renderer", () => {
 		fromString.render(data);
 		fromElement.render(data);
 
-		expect(fromString.root.innerHTML).toBe(fromElement.root.innerHTML);
-		expect(fromString.root.textContent).toBe(fromElement.root.textContent);
-		expect(fromString.root.querySelector("b")?.textContent).toBe("World");
+		expect(fromString.rootElt.innerHTML).toBe(fromElement.rootElt.innerHTML);
+		expect(fromString.rootElt.textContent).toBe(fromElement.rootElt.textContent);
+		expect(fromString.rootElt.querySelector("b")?.textContent).toBe("World");
 	});
 });
 
@@ -158,8 +158,8 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ user: { avatar: "http://avatar.com/john", fullname: "John DOE" } });
 
-		expect(renderer.root.getAttribute("src")).toBe("http://avatar.com/john");
-		expect(renderer.root.getAttribute("title")).toBe("John DOE");
+		expect(renderer.rootElt.getAttribute("src")).toBe("http://avatar.com/john");
+		expect(renderer.rootElt.getAttribute("title")).toBe("John DOE");
 	});
 
 	test("value= binding sets the input value", () => {
@@ -167,7 +167,7 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ user: { name: "Jane" } });
 
-		expect((renderer.root as HTMLInputElement).value).toBe("Jane");
+		expect((renderer.rootElt as HTMLInputElement).value).toBe("Jane");
 	});
 
 	test("supports text and attribute bindings on one element", () => {
@@ -175,8 +175,8 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ link: { label: "Read more", url: "https://example.com" } });
 
-		expect(renderer.root.textContent).toBe("Read more");
-		expect(renderer.root.getAttribute("href")).toBe("https://example.com");
+		expect(renderer.rootElt.textContent).toBe("Read more");
+		expect(renderer.rootElt.getAttribute("href")).toBe("https://example.com");
 	});
 
 	test("class[range]=path toggles one class value and preserves the others", () => {
@@ -186,11 +186,11 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ article: { type: "quote" } });
 
-		expect(renderer.root.classList.contains("quote")).toBe(true);
-		expect(renderer.root.classList.contains("article")).toBe(false);
-		expect(renderer.root.classList.contains("tweet")).toBe(false);
-		expect(renderer.root.classList.contains("row")).toBe(true);
-		expect(renderer.root.classList.contains("container")).toBe(true);
+		expect(renderer.rootElt.classList.contains("quote")).toBe(true);
+		expect(renderer.rootElt.classList.contains("article")).toBe(false);
+		expect(renderer.rootElt.classList.contains("tweet")).toBe(false);
+		expect(renderer.rootElt.classList.contains("row")).toBe(true);
+		expect(renderer.rootElt.classList.contains("container")).toBe(true);
 	});
 
 	test("class toggle reacts to a second data set", () => {
@@ -199,11 +199,11 @@ describe("Renderer data-bind typed bindings", () => {
 		);
 
 		renderer.render({ article: { type: "tweet" } });
-		expect(renderer.root.classList.contains("tweet")).toBe(true);
+		expect(renderer.rootElt.classList.contains("tweet")).toBe(true);
 
 		renderer.render({ article: { type: "article" } });
-		expect(renderer.root.classList.contains("article")).toBe(true);
-		expect(renderer.root.classList.contains("tweet")).toBe(false);
+		expect(renderer.rootElt.classList.contains("article")).toBe(true);
+		expect(renderer.rootElt.classList.contains("tweet")).toBe(false);
 	});
 
 	test("class toggle removes the range classes when the value is out of range", () => {
@@ -213,11 +213,11 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ article: { type: "featured" } });
 
-		expect(renderer.root.classList.contains("article")).toBe(false);
-		expect(renderer.root.classList.contains("quote")).toBe(false);
-		expect(renderer.root.classList.contains("tweet")).toBe(false);
-		expect(renderer.root.classList.contains("row")).toBe(true);
-		expect(renderer.root.classList.contains("active")).toBe(true);
+		expect(renderer.rootElt.classList.contains("article")).toBe(false);
+		expect(renderer.rootElt.classList.contains("quote")).toBe(false);
+		expect(renderer.rootElt.classList.contains("tweet")).toBe(false);
+		expect(renderer.rootElt.classList.contains("row")).toBe(true);
+		expect(renderer.rootElt.classList.contains("active")).toBe(true);
 	});
 
 	test("shorthand binding on an input defaults to value", () => {
@@ -225,7 +225,7 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ user: { name: "Jane" } });
 
-		expect((renderer.root as HTMLInputElement).value).toBe("Jane");
+		expect((renderer.rootElt as HTMLInputElement).value).toBe("Jane");
 	});
 
 	test("shorthand binding on a textarea defaults to value", () => {
@@ -233,7 +233,7 @@ describe("Renderer data-bind typed bindings", () => {
 
 		renderer.render({ user: { bio: "A short bio" } });
 
-		expect((renderer.root as HTMLTextAreaElement).value).toBe("A short bio");
+		expect((renderer.rootElt as HTMLTextAreaElement).value).toBe("A short bio");
 	});
 });
 
@@ -245,7 +245,7 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: ["One", "Two", "Three"] } });
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(3);
 		expect(items[0]?.textContent).toBe("One");
@@ -267,7 +267,7 @@ describe("Renderer data-iterate", () => {
 			}
 		});
 
-		const links = renderer.root.querySelectorAll("a");
+		const links = renderer.rootElt.querySelectorAll("a");
 
 		expect(links.length).toBe(2);
 		expect(links[0]?.textContent).toBe("Temples");
@@ -282,7 +282,7 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: [{ author: "A" }, { author: "B" }] } });
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items[0]?.textContent).toBe("A");
 		expect(items[1]?.textContent).toBe("B");
@@ -295,7 +295,7 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: [] } });
 
-		expect(renderer.root.querySelectorAll("li").length).toBe(0);
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(0);
 	});
 
 	test("re-renders when the collection changes", () => {
@@ -304,11 +304,11 @@ describe("Renderer data-iterate", () => {
 		);
 
 		renderer.render({ article: { quotes: ["A", "B", "C"] } });
-		expect(renderer.root.querySelectorAll("li").length).toBe(3);
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(3);
 
 		renderer.render({ article: { quotes: ["X"] } });
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(1);
 		expect(items[0]?.textContent).toBe("X");
@@ -321,8 +321,8 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { kind: "recent", quotes: ["A"] } });
 
-		expect(renderer.root.classList.contains("recent")).toBe(true);
-		expect(renderer.root.querySelectorAll("li").length).toBe(1);
+		expect(renderer.rootElt.classList.contains("recent")).toBe(true);
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(1);
 	});
 
 	test("removes the data-iterate attribute and detaches the sub-template after construction", () => {
@@ -330,8 +330,8 @@ describe("Renderer data-iterate", () => {
 			"<ul data-iterate='quote: article.quotes'><li data-bind='quote'></li></ul>"
 		);
 
-		expect(renderer.root.hasAttribute("data-iterate")).toBe(false);
-		expect(renderer.root.querySelector("li")).toBeNull();
+		expect(renderer.rootElt.hasAttribute("data-iterate")).toBe(false);
+		expect(renderer.rootElt.querySelector("li")).toBeNull();
 	});
 
 	test("supports the from keyword instead of the colon", () => {
@@ -341,7 +341,7 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: ["One", "Two"] } });
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(2);
 		expect(items[0]?.textContent).toBe("One");
@@ -355,8 +355,8 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: ["Only"] } });
 
-		expect(renderer.root.querySelectorAll("li").length).toBe(1);
-		expect(renderer.root.querySelector("li")?.textContent).toBe("Only");
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(1);
+		expect(renderer.rootElt.querySelector("li")?.textContent).toBe("Only");
 	});
 
 	test("combines data-each with the from keyword", () => {
@@ -366,7 +366,7 @@ describe("Renderer data-iterate", () => {
 
 		renderer.render({ article: { quotes: ["A", "B"] } });
 
-		expect(renderer.root.querySelectorAll("li").length).toBe(2);
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(2);
 	});
 });
 
@@ -376,7 +376,7 @@ describe("Renderer data-render-if", () => {
 
 		renderer.render({ article: { featured: true } });
 
-		expect((renderer.root as HTMLElement).style.display).toBe("");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
 	});
 
 	test("hides the element when the condition is falsy", () => {
@@ -384,7 +384,7 @@ describe("Renderer data-render-if", () => {
 
 		renderer.render({ article: { featured: false } });
 
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 	});
 
 	test("calls a function condition with its owner object as this", () => {
@@ -398,23 +398,23 @@ describe("Renderer data-render-if", () => {
 				}
 			}
 		});
-		expect((renderer.root as HTMLElement).style.display).toBe("");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
 
 		renderer.render({ article: { comments: [], popular: () => false } });
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 	});
 
 	test("flips visibility on re-render", () => {
 		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
 
 		renderer.render({ article: { featured: false } });
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 
 		renderer.render({ article: { featured: true } });
-		expect((renderer.root as HTMLElement).style.display).toBe("");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
 
 		renderer.render({ article: { featured: false } });
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 	});
 
 	test("renders child bindings when shown", () => {
@@ -424,8 +424,8 @@ describe("Renderer data-render-if", () => {
 
 		renderer.render({ article: { featured: true, title: "Hello" } });
 
-		expect((renderer.root as HTMLElement).style.display).toBe("");
-		expect(renderer.root.querySelector("h1")?.textContent).toBe("Hello");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
+		expect(renderer.rootElt.querySelector("h1")?.textContent).toBe("Hello");
 	});
 
 	test("combines with data-bind on the same element", () => {
@@ -435,14 +435,14 @@ describe("Renderer data-render-if", () => {
 
 		renderer.render({ article: { featured: true, title: "Hi" } });
 
-		expect(renderer.root.textContent).toBe("Hi");
-		expect((renderer.root as HTMLElement).style.display).toBe("");
+		expect(renderer.rootElt.textContent).toBe("Hi");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
 	});
 
 	test("removes the data-render-if attribute after construction", () => {
 		const renderer = new Renderer("<div data-render-if='article.featured'>x</div>");
 
-		expect(renderer.root.hasAttribute("data-render-if")).toBe(false);
+		expect(renderer.rootElt.hasAttribute("data-render-if")).toBe(false);
 	});
 });
 
@@ -455,8 +455,8 @@ describe("Renderer partial render", () => {
 		renderer.render({ article: { title: "Old", body: "Body" } });
 		renderer.render({ article: { title: "New" } });
 
-		expect(renderer.root.querySelector("h1")?.textContent).toBe("New");
-		expect(renderer.root.querySelector("p")?.textContent).toBe("Body");
+		expect(renderer.rootElt.querySelector("h1")?.textContent).toBe("New");
+		expect(renderer.rootElt.querySelector("p")?.textContent).toBe("Body");
 	});
 
 	test("keeps every binding when the data carries no matching path", () => {
@@ -465,7 +465,7 @@ describe("Renderer partial render", () => {
 		renderer.render({ title: "Hello" });
 		renderer.render({ other: "x" });
 
-		expect(renderer.root.textContent).toBe("Hello");
+		expect(renderer.rootElt.textContent).toBe("Hello");
 	});
 
 	test("re-stamps an iterate when its collection path is in the data", () => {
@@ -476,7 +476,7 @@ describe("Renderer partial render", () => {
 		renderer.render({ article: { quotes: ["A", "B"] } });
 		renderer.render({ article: { quotes: ["X", "Y", "Z"] } });
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(3);
 		expect(items[0]?.textContent).toBe("X");
@@ -490,7 +490,7 @@ describe("Renderer partial render", () => {
 		renderer.render({ article: { quotes: ["A", "B"] } });
 		renderer.render({ other: "x" });
 
-		expect(renderer.root.querySelectorAll("li").length).toBe(2);
+		expect(renderer.rootElt.querySelectorAll("li").length).toBe(2);
 	});
 
 	test("re-evaluates a render-if when its condition path is in the data", () => {
@@ -499,7 +499,7 @@ describe("Renderer partial render", () => {
 		renderer.render({ article: { featured: true } });
 		renderer.render({ article: { featured: false } });
 
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 	});
 
 	test("does not interpret a flat dotted key as a nested path", () => {
@@ -507,7 +507,7 @@ describe("Renderer partial render", () => {
 
 		renderer.render({ article: { title: "Hello World!" }, "article.title": "Nope" });
 
-		expect(renderer.root.textContent).toBe("Hello World!");
+		expect(renderer.rootElt.textContent).toBe("Hello World!");
 	});
 });
 
@@ -520,8 +520,8 @@ describe("Renderer update", () => {
 		renderer.render({ article: { title: "Old", body: "Body" } });
 		renderer.update("article.title", "New");
 
-		expect(renderer.root.querySelector("h1")?.textContent).toBe("New");
-		expect(renderer.root.querySelector("p")?.textContent).toBe("Body");
+		expect(renderer.rootElt.querySelector("h1")?.textContent).toBe("New");
+		expect(renderer.rootElt.querySelector("p")?.textContent).toBe("Body");
 	});
 
 	test("re-stamps an iterate when its collection path is updated", () => {
@@ -532,7 +532,7 @@ describe("Renderer update", () => {
 		renderer.render({ article: { quotes: ["A", "B"] } });
 		renderer.update("article.quotes", ["X", "Y", "Z"]);
 
-		const items = renderer.root.querySelectorAll("li");
+		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(3);
 		expect(items[0]?.textContent).toBe("X");
@@ -544,13 +544,13 @@ describe("Renderer update", () => {
 		renderer.render({ article: { featured: true } });
 		renderer.update("article.featured", false);
 
-		expect((renderer.root as HTMLElement).style.display).toBe("none");
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("none");
 	});
 
 	test("update returns the root element", () => {
 		const renderer = new Renderer("<h1 data-bind='text=title'></h1>");
 
-		expect(renderer.update("title", "x")).toBe(renderer.root);
+		expect(renderer.update("title", "x")).toBe(renderer.rootElt);
 	});
 });
 
@@ -579,5 +579,177 @@ describe("Renderer serialization", () => {
 		renderer.render({ title: "New" });
 
 		expect(renderer.toHtml()).toBe("<h1>New</h1>");
+	});
+});
+
+describe("Renderer engine correctness fixes (T7)", () => {
+	test("reuses a row's DOM node when its key is unchanged", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='todo: todos' data-key='id'><li data-bind='todo.text'></li></ul>"
+		);
+
+		renderer.render({
+			todos: [
+				{ id: 1, text: "A" },
+				{ id: 2, text: "B" }
+			]
+		});
+
+		const firstRow = renderer.rootElt.querySelector("li");
+
+		renderer.render({
+			todos: [
+				{ id: 1, text: "A edited" },
+				{ id: 2, text: "B" }
+			]
+		});
+
+		const afterRow = renderer.rootElt.querySelector("li");
+
+		expect(afterRow).toBe(firstRow);
+		expect(afterRow?.textContent).toBe("A edited");
+	});
+
+	test("removes a row whose key disappears and keeps the others", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='todo: todos' data-key='id'><li data-bind='todo.text'></li></ul>"
+		);
+
+		renderer.render({
+			todos: [
+				{ id: 1, text: "A" },
+				{ id: 2, text: "B" }
+			]
+		});
+		renderer.render({ todos: [{ id: 2, text: "B" }] });
+
+		const items = renderer.rootElt.querySelectorAll("li");
+
+		expect(items.length).toBe(1);
+		expect(items[0]?.textContent).toBe("B");
+	});
+
+	test("inserts a new row for a new key while reusing existing rows", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='todo: todos' data-key='id'><li data-bind='todo.text'></li></ul>"
+		);
+
+		renderer.render({ todos: [{ id: 1, text: "A" }] });
+		const firstRow = renderer.rootElt.querySelector("li");
+
+		renderer.render({
+			todos: [
+				{ id: 1, text: "A" },
+				{ id: 2, text: "B" }
+			]
+		});
+
+		const items = renderer.rootElt.querySelectorAll("li");
+
+		expect(items.length).toBe(2);
+		expect(items[0]).toBe(firstRow);
+		expect(items[1]?.textContent).toBe("B");
+	});
+
+	test("falls back to the item id property when no data-key is declared", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='todo: todos'><li data-bind='todo.text'></li></ul>"
+		);
+
+		renderer.render({
+			todos: [
+				{ id: "x", text: "A" },
+				{ id: "y", text: "B" }
+			]
+		});
+
+		const firstRow = renderer.rootElt.querySelector("li");
+
+		renderer.render({
+			todos: [
+				{ id: "x", text: "A edited" },
+				{ id: "y", text: "B" }
+			]
+		});
+
+		expect(renderer.rootElt.querySelector("li")).toBe(firstRow);
+	});
+
+	test("toggles a boolean attribute by the value's truthiness", () => {
+		const renderer = new Renderer("<input type='checkbox' data-bind='checked=done' />");
+
+		renderer.render({ done: true });
+		expect(renderer.rootElt.hasAttribute("checked")).toBe(true);
+
+		renderer.render({ done: false });
+		expect(renderer.rootElt.hasAttribute("checked")).toBe(false);
+	});
+
+	test("select shorthand sets the selected option", () => {
+		const renderer = new Renderer(
+			"<select data-bind='choice'><option value='a'>A</option><option value='b'>B</option></select>"
+		);
+
+		renderer.render({ choice: "b" });
+
+		const selected = renderer.rootElt.querySelector("option[selected]");
+
+		expect(selected?.getAttribute("value")).toBe("b");
+	});
+
+	test("does not treat 'from' inside a path as the from keyword", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='messages.from.user'><li data-bind='user'></li></ul>"
+		);
+
+		renderer.render({ messages: { from: { user: ["A", "B"] } } });
+
+		const items = renderer.rootElt.querySelectorAll("li");
+
+		expect(items.length).toBe(2);
+		expect(items[0]?.textContent).toBe("A");
+	});
+
+	test("keeps the trailing s in a non-plural word like status", () => {
+		const renderer = new Renderer(
+			"<ul data-iterate='article.status'><li data-bind='status'></li></ul>"
+		);
+
+		renderer.render({ article: { status: ["ok", "warn"] } });
+
+		const items = renderer.rootElt.querySelectorAll("li");
+
+		expect(items[0]?.textContent).toBe("ok");
+		expect(items[1]?.textContent).toBe("warn");
+	});
+
+	test("shows an element authored display:none when the condition is truthy", () => {
+		const renderer = new Renderer("<div data-render-if='show' style='display:none'>x</div>");
+
+		renderer.render({ show: true });
+
+		expect((renderer.rootElt as HTMLElement).style.display).toBe("");
+	});
+
+	test("clears a binding when the value is null", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>initial</h1>");
+
+		renderer.render({ title: "Hello" });
+		renderer.render({ title: null });
+
+		expect(renderer.rootElt.textContent).toBe("");
+	});
+
+	test("clears a binding when the value is undefined", () => {
+		const renderer = new Renderer("<h1 data-bind='text=title'>initial</h1>");
+
+		renderer.render({ title: "Hello" });
+		renderer.render({ title: undefined });
+
+		expect(renderer.rootElt.textContent).toBe("");
+	});
+
+	test("throws when the template string has multiple root elements", () => {
+		expect(() => new Renderer("<p>a</p><p>b</p>")).toThrow();
 	});
 });

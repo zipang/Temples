@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getProperty, setProperty, splitPath } from "./properties";
+import { getProperty, hasProperty, setProperty, splitPath } from "./properties";
 
 describe("splitPath", () => {
 	test("splits a dotted path", () => {
@@ -124,5 +124,51 @@ describe("setProperty", () => {
 		const data: Record<string, unknown> = {};
 
 		expect(setProperty(data, "title", "x")).toBe(data);
+	});
+
+	test("treats a non-canonical numeric key as an object key, not an array index", () => {
+		const data: Record<string, unknown> = {};
+
+		setProperty(data, "persons[1abc]", "x");
+
+		expect(data).toEqual({ persons: { "1abc": "x" } });
+	});
+
+	test("treats a negative key as an object key, not an array index", () => {
+		const data: Record<string, unknown> = {};
+
+		setProperty(data, "persons[-1]", "x");
+
+		expect(data).toEqual({ persons: { "-1": "x" } });
+	});
+});
+
+describe("hasProperty", () => {
+	test("returns true for a present simple path", () => {
+		expect(hasProperty({ title: "Hello" }, "title")).toBe(true);
+	});
+
+	test("returns true for a present nested path", () => {
+		expect(hasProperty({ article: { title: "Hi" } }, "article.title")).toBe(true);
+	});
+
+	test("returns true when the value is null", () => {
+		expect(hasProperty({ title: null }, "title")).toBe(true);
+	});
+
+	test("returns true when the value is undefined", () => {
+		expect(hasProperty({ title: undefined }, "title")).toBe(true);
+	});
+
+	test("returns false for an absent path", () => {
+		expect(hasProperty({ article: {} }, "article.title")).toBe(false);
+	});
+
+	test("returns false for an empty path", () => {
+		expect(hasProperty({ title: "x" }, "")).toBe(false);
+	});
+
+	test("returns false when an intermediate step is null", () => {
+		expect(hasProperty({ article: null }, "article.title")).toBe(false);
 	});
 });

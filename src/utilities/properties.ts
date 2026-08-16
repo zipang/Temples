@@ -45,6 +45,47 @@ export const getProperty = <T>(source: object, path: string, defaultValue?: T): 
 };
 
 /**
+ * Tell whether a property path is present in the source.
+ *
+ * Unlike `getProperty`, this does not collapse `null` and `undefined` values:
+ * a path that resolves to `null` or `undefined` is still present. A path is
+ * absent only when an intermediate key is missing. Function values are not
+ * evaluated.
+ *
+ * @param source - Object or array to check the path against.
+ * @param path - Property path, e.g. `"persons[0].name"`.
+ * @returns True when every key in the path exists on the source.
+ */
+export const hasProperty = (source: object, path: string): boolean => {
+	const steps = splitPath(path);
+
+	if (steps.length === 0) return false;
+
+	let found: unknown = source;
+
+	for (const key of steps) {
+		if (found === null || (typeof found !== "object" && typeof found !== "function")) return false;
+		if (!Object.hasOwn(found, key)) return false;
+
+		found = (found as Record<string, unknown>)[key];
+	}
+
+	return true;
+};
+
+/**
+ * Tell whether a key is a canonical non-negative integer array index.
+ *
+ * Only digits form an index: `"0"` and `"10"` qualify, while `"01"`, `"-1"`,
+ * `"1abc"`, and `"0x10"` do not. This replaces a `parseInt` heuristic that
+ * misclassified keys such as `"1st"` as array indexes.
+ *
+ * @param key - The candidate key.
+ * @returns True when the key is a canonical array index.
+ */
+const isArrayIndex = (key: string): boolean => /^(0|[1-9][0-9]*)$/.test(key);
+
+/**
  * Set a value at a property path, creating missing containers.
  *
  * Missing intermediate steps become an object, or an array sized to the next
@@ -72,9 +113,7 @@ export const setProperty = (
 		const nextKey = keys[i + 1] ?? lastKey;
 
 		if (current[key] === undefined) {
-			current[key] = Number.isInteger(parseInt(nextKey, 10))
-				? Array(parseInt(nextKey, 10) + 1).fill(undefined)
-				: {};
+			current[key] = isArrayIndex(nextKey) ? Array(Number(nextKey) + 1).fill(undefined) : {};
 		}
 
 		current = current[key] as Record<string, unknown>;
