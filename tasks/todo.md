@@ -1,7 +1,7 @@
 # Task List: Temples 1.0
 
-Tasks are ordered by dependency. Each task should be completable in a single focused session.
-Follow `test-driven-development` for each task: failing test first, then implementation.
+Tasks are ordered by dependency. Each task is completable in a single focused session.
+Follow `test-driven-development`: failing test first, then implementation.
 
 ---
 
@@ -34,57 +34,91 @@ Follow `test-driven-development` for each task: failing test first, then impleme
   - Acceptance: `render(data)` resolves every dotted path present in `data` and applies only the operations bound to that exact path; absent paths keep their current state. A partial dictionary re-renders only the paths it carries. `update(path, value)` re-renders only the binding for that exact path (e.g. `"article.title"`), replacing the flat dotted-path delta. An internal path → operation map gives O(1) lookup. Iterate seeds and render-if conditions participate through the same map.
   - Verify: Unit test renders two bindings then a single-path update, asserting only that element changes. Tests cover untouched absent paths, explicit empty-value clearing, iterate re-stamp, and render-if re-evaluation.
   - Files: `src/engine.ts`, `src/engine.test.ts`, `README.md`
-  - Notes: A flat dotted-path delta (`{ "article.title": "New" }`) is NOT supported — `render()` treats dotted keys as literal keys, not nested paths. Single-path updates go through `update(path, value)`. The DOM is the state; no data is retained between calls. Bindings inside an iterated sub-template are not individually updatable; the iterate re-stamp refreshes them.
 
-- [ ] **T6: Renderer toHtml()/renderToString() serialization**
+- [x] **T6: Renderer toHtml()/renderToString() serialization**
   - Acceptance: `Renderer#toHtml()` returns the serialized HTML of the rendered root. `renderToString()` is a synonym for `toHtml()`. There is no `Temples` registry and no `destroy()` (the v0 name-based registry is deprecated and removed).
   - Verify: Unit test renders a template from an HTML string and a DOM element, and asserts the serialized output matches expected markup.
   - Files: `src/engine.ts`, `src/engine.test.ts`
 
+- [x] **T7: Engine correctness fixes (from adversarial review)**
+  - Acceptance:
+    - `data-iterate` uses keyed reconciliation: rows are tracked by a key (`data-key` attribute or item `id`); re-render inserts/removes/moves only changed rows, preserving input focus and scroll.
+    - Boolean attributes (`checked`, `disabled`, `hidden`) toggle via the DOM property, not `setAttribute` (presence-based).
+    - `<select>` shorthand sets the selected option, not an inert `value` attribute.
+    - `parseLoop` no longer mis-parses `from`/`:` inside a path (`messages.from.user`); auto-naming only strips a plural `s` (`status` stays `status`).
+    - `data-render-if` restores a visible state even when the element is authored `display:none`.
+    - `render()` clears bindings whose value is `null`/`undefined` (not just `""`).
+    - `toElement` rejects or documents multi-root string sources instead of silently dropping siblings.
+    - `properties.ts` uses strict array-index detection (drop the `parseInt` heuristic).
+  - Verify: Unit tests for each fix. `bun run check` and `bun run typecheck` pass.
+  - Files: `src/engine.ts`, `src/utilities/properties.ts`, `src/engine.test.ts`
+
 ## Phase 3: SSR
 
-- [ ] **T7: ./ssr entry — linkedom wiring**
+- [x] **T8: ./ssr entry — linkedom wiring**
   - Acceptance: Importing `temples/ssr` sets up a linkedom-backed DOM so `new Renderer(htmlString)` renders and `renderer.renderToString()` serializes on the server without a browser. The main entry does not statically import linkedom.
   - Verify: Unit test run on the server creates a Renderer from an HTML string and asserts `renderToString` output matches the browser path on the same template and data. Round-trip test for entities and void tags.
-  - Files: `src/ssr.ts`, `ssr.test.ts`
+  - Files: `src/ssr.ts`, `src/ssr.test.ts`
 
-## Phase 4: Web Component
+## Phase 4: Reactive state + Web Component
 
-- [ ] **T8: TemplesComponent skeleton + define() + engine-backed render**
-  - Acceptance: `TemplesComponent.define(tagName, Class, { template })` parses the HTML string into a `<template>` element and calls `customElements.define()`. On `connectedCallback`, the template content is cloned and bindings are rendered through the engine. On `disconnectedCallback`, children are cleaned up.
-  - Verify: Unit test defines a trivial component with `<p data-bind="title">Hello</p>`, sets `title="Hello"`, appends to a test DOM, asserts the `<p>` shows "Hello".
-  - Files: `index.ts`, `index.test.ts`
+- [ ] **T9: reactive() proxy utility**
+  - Acceptance: `reactive(target)` returns a deep proxy; mutating nested properties/arrays notifies subscribers. Subscribers can be attached and detached.
+  - Verify: Unit test mutates a nested property and an array element, asserting the subscriber fired; detaches and asserts it stops firing.
+  - Files: `src/reactive.ts`, `src/reactive.test.ts`
 
-- [ ] **T9: registerEvents() helper**
-  - Acceptance: `registerEvents(host, eventMap)` attaches listeners per `"eventType selector"` entries, passes the host to handlers, and returns a cleanup function. `connectedCallback` calls it; `disconnectedCallback` calls the cleanup.
-  - Verify: Unit test registers a `click .btn` handler, simulates a click, asserts the handler ran with the host. Then calls cleanup, clicks again, and asserts the handler is NOT called.
-  - Files: `src/register-events.ts`, `register-events.test.ts`
+- [ ] **T10: TemplesComponent reactive state + define()**
+  - Acceptance:
+    - `static tag`, `static template`, `static events`, `static observedAttributes`, `static attributeTypes` fields.
+    - `TodoApp.define()` parses the template once and calls `customElements.define(this.tag, this)`.
+    - `this.state` is a reactive proxy; any mutation re-renders (full re-render + keyed reconciliation).
+    - Observed attributes write into `state` (coerced via `attributeTypes`); attribute change → state → render.
+    - The old `update()`/`render()` public methods and `this.data` are removed.
+  - Verify: Unit test defines a component, mutates `state`, asserts re-render; sets an attribute, asserts coerced state and re-render.
+  - Files: `src/component.ts`, `src/component.test.ts`
 
-- [ ] **T10: Attribute aggregation + attributeChangedCallback + update**
-  - Acceptance: Observed attribute values aggregate into `this.data`. When an observed attribute changes via `setAttribute`, `attributeChangedCallback` updates `this.data` and triggers `render()`. `update(path, value)` delegates to the engine's partial update.
-  - Verify: Unit test sets `title="Hello"`, asserts the bound element shows "Hello". Then `setAttribute("title", "World")` and asserts it updates to "World".
-  - Files: `index.ts`, `reactivity.test.ts`
+## Phase 5: Events & messaging
 
-## Phase 5: jQuery plugin
+- [ ] **T11: registerEvents() — (event, host) signature**
+  - Acceptance: Handlers receive `(event, host)`; `host` is typed `TemplesComponent`; `"eventType selector"` keys are validated at registration (not lazily at event time).
+  - Verify: Unit test registers a `click .btn` handler, simulates a click, asserts the handler ran with `(event, host)`. Then calls cleanup, clicks again, and asserts the handler is NOT called.
+  - Files: `src/register-events.ts`, `src/register-events.test.ts`
 
-- [ ] **T11: ./jquery entry — $.fn.temples(data)**
+- [ ] **T12: emit()/on() messaging**
+  - Acceptance: `this.emit(name, detail)` dispatches a bubbling `CustomEvent`; `this.on(name, handler)` subscribes and returns an unsubscribe function. Works across sibling components.
+  - Verify: Unit test emits from one component and asserts a sibling's `on` handler receives the detail; unsubscribes and asserts it stops.
+  - Files: `src/component.ts`, tests.
+
+## Phase 6: jQuery plugin
+
+- [ ] **T13: ./jquery entry — $.fn.temples(data)**
   - Acceptance: Importing `temples/jquery` registers `$.fn.temples(data)` to render data into each matched element. `$.fn.temples()` returns the prepared Renderer. jQuery is a peer dependency. The absence of `$` throws a clear error.
   - Verify: Unit test (jquery as devDependency) prepares a list template, calls `$(".list").temples(data)`, asserts rendered output. Test with two matched elements.
-  - Files: `src/jquery.ts`, `jquery.test.ts`
+  - Files: `src/jquery.ts`, `src/jquery.test.ts`
 
-## Phase 6: Example & Polish
+## Phase 7: Tree-shakeable build
 
-- [ ] **T12: Flipping-card example component**
-  - Acceptance: All four files are implemented (`flipping-card.html`, `flipping-card.js`, `flipping-card.css`, `index.ts`). The component renders a flip card with front/back faces. `flip()` and `unflip()` state-transition methods work by setting the `flipped` attribute.
-  - Verify: `bun run typecheck` passes. The component can be imported and instantiated in a test DOM.
-  - Files: `example/components/flipping-card/flipping-card.html`, `flipping-card.js`, `flipping-card.css`, `index.ts`
+- [ ] **T14: Build + public exports**
+  - Acceptance:
+    - `src/index.ts` exports `Renderer`, `TemplesComponent`, `reactive`, `registerEvents`, `EventMap`, and the data types.
+    - `package.json` adds `"sideEffects": false`.
+    - `bun run build` emits ESM to `dist/` (`index.js`, `engine.js`, `ssr.js`, `jquery.js`).
+    - The main bundle contains no linkedom/jquery (tree-shake check).
+  - Verify: `bun run build` succeeds; inspect `dist/index.js` exports and confirm no `linkedom`/`jquery` import.
+  - Files: `src/index.ts`, `package.json`, build script.
 
-- [ ] **T13: Demo page + bun demo script**
-  - Acceptance: `example/index.html` loads the flipping-card component and displays it. `bun demo` (or equivalent) serves the example page.
-  - Verify: Run `bun demo`, open the page in a browser (or `agent-browser`), click the flip button, confirm the card flips. Screenshot for evidence.
-  - Files: `example/index.html`, `package.json` (demo script)
+## Phase 8: Example (TODO app, real integration test)
 
-- [ ] **T14: Final README review**
-  - Acceptance: README.md reflects the standalone engine, the `Temples` API, the SSR entry, the jQuery plugin, and the component API with no drift.
+- [ ] **T15: TODO app example — no bundling**
+  - Acceptance:
+    - `example/index.html` loads `../dist/index.js` via `<script type="module">`; no Bun `.html`/`.ts` import magic.
+    - Components: `todo-app` (list + input + form), `todo-item` (keyed row), `todo-counter` (messaging consumer via `on("todo-count-changed")`).
+    - Demonstrates reactive state, keyed list, two-way input, `submit` with `preventDefault`, and `emit`/`on`.
+    - `demo` script = `bun run build` then static serve of `example/`.
+  - Verify: Run `bun run demo`, open the page in a browser (or `agent-browser`), add/remove/complete todos, confirm the counter updates. Screenshot for evidence.
+  - Files: `example/index.html`, `example/components/*.js`, `example/demo.css`, `package.json`.
+
+- [ ] **T16: README + example/README review**
+  - Acceptance: README reflects the reactive-state API, `(event, host)` handlers, `emit`/`on`, keyed reconciliation, and the no-bundling example. Cross-check every code example.
   - Verify: Read the README against the actual code. Cross-check every code example in the README against the real implementation.
   - Files: `README.md`, `example/README.md`
