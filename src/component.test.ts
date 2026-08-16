@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { TemplesComponent } from "./component";
+import { type AttributeType, TemplesComponent } from "./component";
 import { reactive } from "./reactive";
 
 describe("TemplesComponent.define", () => {
 	test("defines a custom element from static tag and template", () => {
 		class Greeter extends TemplesComponent {
-			static tag = "greeter-card";
-			static template = "<p data-bind='text=title'>Hello</p>";
+			static override tag = "greeter-card";
+			static override template = "<p data-bind='text=title'>Hello</p>";
 		}
 
 		Greeter.define();
@@ -19,8 +19,8 @@ describe("TemplesComponent.define", () => {
 
 	test("inserts a template keyed by tag name into the document head", () => {
 		class Greeter extends TemplesComponent {
-			static tag = "greeter-head";
-			static template = "<p data-bind='text=title'>Hello</p>";
+			static override tag = "greeter-head";
+			static override template = "<p data-bind='text=title'>Hello</p>";
 		}
 
 		Greeter.define();
@@ -33,9 +33,9 @@ describe("TemplesComponent.define", () => {
 
 	test("renders from state and re-renders on a state mutation", () => {
 		class Greeter extends TemplesComponent {
-			static tag = "greeter-render";
-			static template = "<p data-bind='text=title'>Hello</p>";
-			state = reactive({ title: "Hello" });
+			static override tag = "greeter-render";
+			static override template = "<p data-bind='text=title'>Hello</p>";
+			override state = reactive({ title: "Hello" });
 		}
 
 		Greeter.define();
@@ -53,9 +53,9 @@ describe("TemplesComponent.define", () => {
 
 	test("re-renders on a nested state mutation", () => {
 		class Profile extends TemplesComponent {
-			static tag = "profile-card";
-			static template = "<span data-bind='text=user.name'>?</span>";
-			state = reactive({ user: { name: "Jane" } });
+			static override tag = "profile-card";
+			static override template = "<span data-bind='text=user.name'>?</span>";
+			override state = reactive({ user: { name: "Jane" } });
 		}
 
 		Profile.define();
@@ -73,11 +73,15 @@ describe("TemplesComponent.define", () => {
 
 	test("coerces observed attributes into state and re-renders", () => {
 		class Meter extends TemplesComponent {
-			static tag = "meter-card";
-			static template = "<p data-bind='text=count'>0</p><span data-bind='text=done'>?</span>";
-			static observedAttributes = ["count", "done"];
-			static attributeTypes = { count: "number", done: "boolean" };
-			state = reactive({ count: 0, done: false });
+			static override tag = "meter-card";
+			static override template =
+				"<p data-bind='text=count'>0</p><span data-bind='text=done'>?</span>";
+			static override observedAttributes = ["count", "done"];
+			static override attributeTypes: Record<string, AttributeType> = {
+				count: "number",
+				done: "boolean"
+			};
+			override state = reactive({ count: 0, done: false });
 		}
 
 		Meter.define();
@@ -101,11 +105,11 @@ describe("TemplesComponent.define", () => {
 
 	test("maps a falsey boolean attribute to false", () => {
 		class Flag extends TemplesComponent {
-			static tag = "flag-card";
-			static template = "<span data-bind='text=done'>?</span>";
-			static observedAttributes = ["done"];
-			static attributeTypes = { done: "boolean" };
-			state = reactive({ done: true });
+			static override tag = "flag-card";
+			static override template = "<span data-bind='text=done'>?</span>";
+			static override observedAttributes = ["done"];
+			static override attributeTypes: Record<string, AttributeType> = { done: "boolean" };
+			override state = reactive({ done: true });
 		}
 
 		Flag.define();
@@ -121,11 +125,11 @@ describe("TemplesComponent.define", () => {
 
 	test("removing an observed attribute resets the coerced state", () => {
 		class Meter extends TemplesComponent {
-			static tag = "meter-remove";
-			static template = "<p data-bind='text=count'>0</p>";
-			static observedAttributes = ["count"];
-			static attributeTypes = { count: "number" };
-			state = reactive({ count: 0 });
+			static override tag = "meter-remove";
+			static override template = "<p data-bind='text=count'>0</p>";
+			static override observedAttributes = ["count"];
+			static override attributeTypes: Record<string, AttributeType> = { count: "number" };
+			override state = reactive({ count: 0 });
 		}
 
 		Meter.define();
@@ -144,9 +148,9 @@ describe("TemplesComponent.define", () => {
 
 	test("disconnectedCallback cleans up the children", () => {
 		class Greeter extends TemplesComponent {
-			static tag = "greeter-cleanup";
-			static template = "<p data-bind='text=title'>Hello</p>";
-			state = reactive({ title: "Hi" });
+			static override tag = "greeter-cleanup";
+			static override template = "<p data-bind='text=title'>Hello</p>";
+			override state = reactive({ title: "Hi" });
 		}
 
 		Greeter.define();
@@ -163,19 +167,19 @@ describe("TemplesComponent.define", () => {
 
 	test("composed components re-render when the parent state changes", () => {
 		class TodoItem extends TemplesComponent {
-			static tag = "todo-item";
-			static template = "<li data-bind='text=label'></li>";
-			static observedAttributes = ["label"];
-			state = reactive({ label: "" });
+			static override tag = "todo-item";
+			static override template = "<li data-bind='text=label'></li>";
+			static override observedAttributes = ["label"];
+			override state = reactive({ label: "" });
 		}
 
 		TodoItem.define();
 
 		class TodoList extends TemplesComponent {
-			static tag = "todo-list";
-			static template =
+			static override tag = "todo-list";
+			static override template =
 				"<ul data-iterate='item: items'><todo-item data-bind='label=item.label'></todo-item></ul>";
-			state = reactive({ items: [{ label: "A" }, { label: "B" }] });
+			override state = reactive({ items: [{ label: "A" }, { label: "B" }] });
 		}
 
 		TodoList.define();
@@ -190,7 +194,9 @@ describe("TemplesComponent.define", () => {
 		expect(list.querySelectorAll("todo-item").length).toBe(3);
 		expect(list.querySelectorAll("todo-item")[2]?.textContent).toBe("C");
 
-		list.state.items[0].label = "A1";
+		const firstItem = list.state.items[0];
+
+		if (firstItem !== undefined) firstItem.label = "A1";
 
 		expect(list.querySelectorAll("todo-item")[0]?.textContent).toBe("A1");
 		list.remove();
@@ -207,24 +213,24 @@ describe("TemplesComponent events", () => {
 			options?: AddEventListenerOptions | boolean
 		) => {
 			added.push(type);
-			original.call(document, type, listener, options);
+			original.call(document, type, listener as EventListenerOrEventListenerObject, options);
 		}) as typeof document.addEventListener;
 
 		document.addEventListener = spy;
 
 		try {
 			class Alpha extends TemplesComponent {
-				static tag = "event-alpha";
-				static template = "<b class='x'>a</b>";
-				static events = { "dblclick .x": () => undefined };
-				state = reactive({});
+				static override tag = "event-alpha";
+				static override template = "<b class='x'>a</b>";
+				static override events = { "dblclick .x": () => undefined };
+				override state = reactive({});
 			}
 
 			class Beta extends TemplesComponent {
-				static tag = "event-beta";
-				static template = "<i class='x'>b</i>";
-				static events = { "dblclick .x": () => undefined };
-				state = reactive({});
+				static override tag = "event-beta";
+				static override template = "<i class='x'>b</i>";
+				static override events = { "dblclick .x": () => undefined };
+				override state = reactive({});
 			}
 
 			Alpha.define();
@@ -240,14 +246,14 @@ describe("TemplesComponent events", () => {
 		const captured: Array<{ evt: Event; cmpnt: TemplesComponent }> = [];
 
 		class Counter extends TemplesComponent {
-			static tag = "event-counter";
-			static template = "<input class='field'><button class='inc'>+1</button>";
-			static events = {
+			static override tag = "event-counter";
+			static override template = "<input class='field'><button class='inc'>+1</button>";
+			static override events = {
 				"click .inc": (evt: Event, cmpnt: TemplesComponent) => {
 					captured.push({ evt, cmpnt });
 				}
 			};
-			state = reactive({ count: 0 });
+			override state = reactive({ count: 0 });
 		}
 
 		Counter.define();
@@ -268,16 +274,16 @@ describe("TemplesComponent events", () => {
 		let inputValue = "";
 
 		class Form extends TemplesComponent {
-			static tag = "event-form";
-			static template = "<form class='form'><input class='field' value='hi'></form>";
-			static events = {
+			static override tag = "event-form";
+			static override template = "<form class='form'><input class='field' value='hi'></form>";
+			static override events = {
 				"submit .form": (evt: Event) => {
 					evt.preventDefault();
 					defaultPrevented = evt.defaultPrevented;
 					inputValue = (evt.target as HTMLFormElement).querySelector("input")?.value ?? "";
 				}
 			};
-			state = reactive({});
+			override state = reactive({});
 		}
 
 		Form.define();
@@ -298,12 +304,12 @@ describe("TemplesComponent events", () => {
 		const clicked: TemplesComponent[] = [];
 
 		class Counter extends TemplesComponent {
-			static tag = "event-multi";
-			static template = "<button class='inc'>+1</button>";
-			static events = {
+			static override tag = "event-multi";
+			static override template = "<button class='inc'>+1</button>";
+			static override events = {
 				"click .inc": (_evt: Event, cmpnt: TemplesComponent) => clicked.push(cmpnt)
 			};
-			state = reactive({ count: 0 });
+			override state = reactive({ count: 0 });
 		}
 
 		Counter.define();
@@ -333,21 +339,21 @@ describe("TemplesComponent events", () => {
 		const outerHits: TemplesComponent[] = [];
 
 		class Inner extends TemplesComponent {
-			static tag = "event-inner";
-			static template = "<button class='act'>go</button>";
-			static events = {
+			static override tag = "event-inner";
+			static override template = "<button class='act'>go</button>";
+			static override events = {
 				"click .act": (_evt: Event, cmpnt: TemplesComponent) => innerHits.push(cmpnt)
 			};
-			state = reactive({});
+			override state = reactive({});
 		}
 
 		class Outer extends TemplesComponent {
-			static tag = "event-outer";
-			static template = "<event-inner></event-inner>";
-			static events = {
+			static override tag = "event-outer";
+			static override template = "<event-inner></event-inner>";
+			static override events = {
 				"click .act": (_evt: Event, cmpnt: TemplesComponent) => outerHits.push(cmpnt)
 			};
-			state = reactive({});
+			override state = reactive({});
 		}
 
 		Inner.define();
@@ -370,14 +376,14 @@ describe("TemplesComponent events", () => {
 		let hits = 0;
 
 		class Counter extends TemplesComponent {
-			static tag = "event-mismatch";
-			static template = "<button class='other'>x</button>";
-			static events = {
+			static override tag = "event-mismatch";
+			static override template = "<button class='other'>x</button>";
+			static override events = {
 				"click .inc": () => {
 					hits++;
 				}
 			};
-			state = reactive({});
+			override state = reactive({});
 		}
 
 		Counter.define();
@@ -395,14 +401,14 @@ describe("TemplesComponent events", () => {
 		let hits = 0;
 
 		class Counter extends TemplesComponent {
-			static tag = "event-outside";
-			static template = "<button class='inc'>+1</button>";
-			static events = {
+			static override tag = "event-outside";
+			static override template = "<button class='inc'>+1</button>";
+			static override events = {
 				"click .inc": () => {
 					hits++;
 				}
 			};
-			state = reactive({});
+			override state = reactive({});
 		}
 
 		Counter.define();
@@ -423,15 +429,15 @@ describe("TemplesComponent messaging", () => {
 		const received: CustomEvent[] = [];
 
 		class TaskItem extends TemplesComponent {
-			static tag = "msg-item-a";
-			static template = "<li>task</li>";
-			state = reactive({});
+			static override tag = "msg-item-a";
+			static override template = "<li>task</li>";
+			override state = reactive({});
 		}
 
 		class TaskList extends TemplesComponent {
-			static tag = "msg-list-a";
-			static template = "<ul></ul>";
-			state = reactive({});
+			static override tag = "msg-list-a";
+			static override template = "<ul></ul>";
+			override state = reactive({});
 		}
 
 		TaskItem.define();
@@ -453,15 +459,15 @@ describe("TemplesComponent messaging", () => {
 		const notes: unknown[] = [];
 
 		class TaskItem extends TemplesComponent {
-			static tag = "msg-item-b";
-			static template = "<li></li>";
-			state = reactive({});
+			static override tag = "msg-item-b";
+			static override template = "<li></li>";
+			override state = reactive({});
 		}
 
 		class TaskNote extends TemplesComponent {
-			static tag = "msg-note-b";
-			static template = "<p></p>";
-			state = reactive({});
+			static override tag = "msg-note-b";
+			static override template = "<p></p>";
+			override state = reactive({});
 		}
 
 		TaskItem.define();
@@ -484,9 +490,9 @@ describe("TemplesComponent messaging", () => {
 		let hits = 0;
 
 		class TaskItem extends TemplesComponent {
-			static tag = "msg-item-c";
-			static template = "<li></li>";
-			state = reactive({});
+			static override tag = "msg-item-c";
+			static override template = "<li></li>";
+			override state = reactive({});
 		}
 
 		TaskItem.define();
@@ -505,9 +511,9 @@ describe("TemplesComponent messaging", () => {
 		let hits = 0;
 
 		class Emitter extends TemplesComponent {
-			static tag = "msg-emitter";
-			static template = "<i></i>";
-			state = reactive({});
+			static override tag = "msg-emitter";
+			static override template = "<i></i>";
+			override state = reactive({});
 		}
 
 		Emitter.define();
@@ -530,15 +536,15 @@ describe("TemplesComponent messaging", () => {
 		let hits = 0;
 
 		class TaskItem extends TemplesComponent {
-			static tag = "msg-item-d";
-			static template = "<li></li>";
-			state = reactive({});
+			static override tag = "msg-item-d";
+			static override template = "<li></li>";
+			override state = reactive({});
 		}
 
 		class TaskList extends TemplesComponent {
-			static tag = "msg-list-d";
-			static template = "<ul></ul>";
-			state = reactive({});
+			static override tag = "msg-list-d";
+			static override template = "<ul></ul>";
+			override state = reactive({});
 		}
 
 		TaskItem.define();
@@ -553,5 +559,53 @@ describe("TemplesComponent messaging", () => {
 		item.emit("completed");
 
 		expect(hits).toBe(1);
+	});
+});
+
+describe("TemplesComponent css and global store", () => {
+	test("static css defaults to an empty string", () => {
+		class Widget extends TemplesComponent {
+			static override tag = "css-default";
+			static override template = "<p>hi</p>";
+		}
+
+		expect(Widget.css).toBe("");
+	});
+
+	test("define({ globalStore }) seeds an observed attribute from the store", () => {
+		class Widget extends TemplesComponent {
+			static override tag = "store-seed";
+			static override template = "<p data-bind='text=title'>?</p>";
+			static override observedAttributes = ["title"];
+			override state = reactive({ title: "" });
+		}
+
+		Widget.define({ globalStore: { title: "From Store" } });
+
+		const elt = document.createElement("store-seed") as Widget;
+
+		document.body.appendChild(elt);
+
+		expect(elt.querySelector("p")?.textContent).toBe("From Store");
+		elt.remove();
+	});
+
+	test("an explicit attribute masks the same-named store key", () => {
+		class Widget extends TemplesComponent {
+			static override tag = "store-mask";
+			static override template = "<p data-bind='text=title'>?</p>";
+			static override observedAttributes = ["title"];
+			override state = reactive({ title: "" });
+		}
+
+		Widget.define({ globalStore: { title: "From Store" } });
+
+		const elt = document.createElement("store-mask") as Widget;
+
+		elt.setAttribute("title", "Explicit");
+		document.body.appendChild(elt);
+
+		expect(elt.querySelector("p")?.textContent).toBe("Explicit");
+		elt.remove();
 	});
 });

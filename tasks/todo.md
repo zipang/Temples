@@ -102,10 +102,10 @@ Follow `test-driven-development`: failing test first, then implementation.
 - [ ] **T14: Build + public exports**
   - Acceptance:
     - `src/index.ts` exports `Renderer`, `TemplesComponent`, `reactive`, `registerEvents`, `EventMap`, and the data types.
-    - `package.json` adds `"sideEffects": false`.
+    - `package.json` sets `"sideEffects": ["./dist/ssr.js"]` (the SSR entry is the only side-effectful output; `prepare()` installs the linkedom DOM on `globalThis`).
     - `bun run build` emits ESM to `dist/` (`index.js`, `engine.js`, `ssr.js`, `jquery.js`).
-    - The main bundle contains no linkedom/jquery (tree-shake check).
-  - Verify: `bun run build` succeeds; inspect `dist/index.js` exports and confirm no `linkedom`/`jquery` import.
+    - The main bundle contains no linkedom/jquery (tree-shake check). `dist/ssr.js` imports in a clean Node process without pre-installed DOM globals.
+  - Verify: `bun run build` succeeds; inspect `dist/index.js` exports and confirm no `linkedom`/`jquery` import; `node -e "import('./dist/ssr.js').then(m => m.prepare(...))"` renders.
   - Files: `src/index.ts`, `package.json`, build script.
 
 ## Phase 8: Example (TODO app, real integration test)
@@ -123,3 +123,42 @@ Follow `test-driven-development`: failing test first, then implementation.
   - Acceptance: README reflects the reactive-state API, `(event, component)` handlers, `emit`/`on`, keyed reconciliation, and the no-bundling example. Cross-check every code example.
   - Verify: Read the README against the actual code. Cross-check every code example in the README against the real implementation.
   - Files: `README.md`, `example/README.md`
+
+## Phase 9: SSR `prepare()` templating API
+
+Spec: `tasks/spec-ssr-prepare.md`.
+
+- [x] **T17: TemplesComponent — `static css` + global store in `define()`**
+  - Acceptance:
+    - `TemplesComponent` gains `static css = ""`.
+    - `define(options?: { globalStore?: TemplesData })` stores the store; `define()` stays callable with no args.
+    - On mount, a component resolves each observed attribute with precedence: explicit attribute on the tag **wins**, then the global store key of the same name, then the default.
+  - Verify: Unit test defines a component with `define({ globalStore })`, mounts it with and without an explicit attribute, asserts the store seeds the attribute and the explicit attribute masks the store.
+  - Files: `src/component.ts`, `src/component.test.ts`
+
+- [x] **T18: `prepare(source, options)` — reusable `render(data) => string`**
+  - Acceptance:
+    - `prepare(source)` returns `render(data) => string`; `source` is string-only and must have a single root element (throws otherwise).
+    - Each `render(data)` call is independent (fresh render, no state leak with partial data).
+    - Default output strips `data-*` control attributes.
+  - Verify: Unit test prepares a template, renders two data sets, asserts independent correct strings; multi-root source throws.
+  - Files: `src/ssr.ts`, `src/ssr.test.ts`
+
+- [x] **T19: `prepare` `webComponents` — render TemplesComponent usages**
+  - Acceptance:
+    - `webComponents: [Ctor]` registers each class and renders its custom tag to its `template` markup.
+    - Each used component's `css` is concatenated into one `<style>` tag in the output.
+    - The global store seeds a component's observed attributes.
+  - Verify: Unit test renders a template containing a custom tag with `webComponents`, asserts the tag renders its template and the `<style>` holds the concatenated css.
+  - Files: `src/ssr.ts`, `src/component.ts`, `src/ssr.test.ts`
+
+- [x] **T20: `prepare` `removeDataBinding` — strip component traces**
+  - Acceptance: `removeDataBinding: true` renders every used component to its plain static markup (no custom tag, no `data-*`), with no Temples footprint.
+  - Verify: Unit test renders a custom tag with `removeDataBinding: true`, asserts no custom tag and no `data-*` in the output.
+  - Files: `src/ssr.ts`, `src/ssr.test.ts`
+
+- [ ] **T21: `prepare` `rehydrate` — include library, components active (final, hardest)**
+  - Acceptance: `rehydrate: true` includes the TemplesComponent library in the page source so custom elements mount and activate in the browser.
+  - Verify: Unit test asserts the output includes the library and the custom tags remain active.
+  - Files: `src/ssr.ts`, `src/ssr.test.ts`
+  - Notes: Deferred to a later slice; requires engine support to preserve control attributes.

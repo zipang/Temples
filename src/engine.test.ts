@@ -647,7 +647,7 @@ describe("Renderer engine correctness fixes (T7)", () => {
 		const items = renderer.rootElt.querySelectorAll("li");
 
 		expect(items.length).toBe(2);
-		expect(items[0]).toBe(firstRow);
+		expect(items[0] as HTMLLIElement | null).toBe(firstRow);
 		expect(items[1]?.textContent).toBe("B");
 	});
 

@@ -4,10 +4,11 @@ import { getProperty, hasProperty, setProperty } from "./utilities/properties";
  * Value that flows from data into a rendered DOM node.
  *
  * Text content, attributes, and input values are all scalar: strings,
- * numbers, and booleans. Objects and functions are not meaningful rendered
- * values, so the resolver contract excludes them.
+ * numbers, and booleans. `null` and `undefined` clear a binding. Objects and
+ * functions are not meaningful rendered values, so the resolver contract
+ * excludes them.
  */
-export type RenderValue = string | number | boolean;
+export type RenderValue = string | number | boolean | null | undefined;
 
 /**
  * The recursive dictionary shape that Temples renders against.

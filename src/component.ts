@@ -93,6 +93,15 @@ export class TemplesComponent extends HTMLElement {
 	static template = "";
 
 	/**
+	 * The component stylesheet, concatenated into the SSR output by `prepare()`.
+	 *
+	 * Fed by bun's CSS bundling (`import stylesheet from "./component.css"`) in
+	 * the browser path, or assigned directly. `prepare()` reads it to build one
+	 * `<style>` tag for every used component.
+	 */
+	static css = "";
+
+	/**
 	 * Optional declarative event map, `"eventType selector": handler`.
 	 */
 	static events: EventMap = {};
@@ -106,6 +115,16 @@ export class TemplesComponent extends HTMLElement {
 	 * Optional coercion map from attribute name to `AttributeType`.
 	 */
 	static attributeTypes: Record<string, AttributeType> = {};
+
+	/**
+	 * The global data store shared by every component.
+	 *
+	 * Set through `define({ globalStore })`. A component consults it on mount as
+	 * a fallback for its observed attributes: an explicit attribute on the tag
+	 * wins, and the store key of the same name is used only when the attribute
+	 * is absent.
+	 */
+	static globalStore: TemplesData | undefined;
 
 	/**
 	 * Reactive component state.
@@ -129,9 +148,17 @@ export class TemplesComponent extends HTMLElement {
 	 * Ensures a `<template id="tag">` exists in the document head, registers a
 	 * document-level listener for every event type in `events`, then calls
 	 * `customElements.define(this.tag, this)`.
+	 *
+	 * @param options - Optional `globalStore` data dictionary shared by every
+	 * component. It seeds observed attributes that are absent on the tag.
 	 */
-	static define(): void {
+	static define(options?: { globalStore?: TemplesData }): void {
+		// biome-ignore lint/complexity/noThisInStatic: `this` is the subclass constructor.
 		const ctor = this as typeof TemplesComponent;
+
+		if (options?.globalStore !== undefined) {
+			TemplesComponent.globalStore = options.globalStore;
+		}
 
 		TemplesComponent.resolveTemplate(ctor);
 		TemplesComponent.registerEventTypes(ctor);
@@ -281,6 +308,11 @@ export class TemplesComponent extends HTMLElement {
 		for (const name of ctor.observedAttributes) {
 			if (this.hasAttribute(name)) {
 				this.state[name] = this.coerceAttribute(name, this.getAttribute(name));
+			} else if (
+				TemplesComponent.globalStore !== undefined &&
+				name in TemplesComponent.globalStore
+			) {
+				this.state[name] = TemplesComponent.globalStore[name];
 			}
 		}
 
