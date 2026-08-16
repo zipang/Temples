@@ -1,8 +1,6 @@
 import { parseHTML } from "linkedom";
 import type { TemplesComponent } from "./component";
-import { Renderer, type TemplesData } from "./engine";
-
-export { Renderer };
+import type { TemplesData } from "./engine";
 
 /**
  * Options that reconfigure how `prepare` renders a template.
@@ -31,7 +29,7 @@ export interface PrepareOptions {
  * A prepared render function: given a data dictionary, returns the rendered
  * markup as an HTML string.
  */
-export type PreparedRender = (data: TemplesData) => string;
+export type PreparedRender = (data: TemplesData) => Promise<string>;
 
 /**
  * The DOM globals that a linkedom window exposes for server-side rendering.
@@ -59,72 +57,122 @@ const DOM_GLOBALS = [
 /**
  * Prepare a template source into a reusable render function.
  *
- * `prepare` is string-only: the source is an HTML string with exactly one root
- * element. It parses the source with linkedom, installs the resulting DOM on
- * `globalThis`, then loads the engine and `TemplesComponent` only after those
- * globals exist. The returned `render(data)` builds a fresh `Renderer` on every
- * call, so consecutive calls are independent and no state leaks between data sets.
- * Each call returns the rendered markup as an HTML string.
+ * `prepare` is string-only. It parses the source with linkedom and installs the
+ * resulting DOM on `globalThis`. The source is either a whole HTML document
+ * (its root is `<html>`) or a single node (a fragment with one root element).
+ * Both are handled: a whole document serializes with its doctype, while a single
+ * node serializes as that node.
  *
- * @param source - HTML string with a single root element.
+ * The returned `render(data)` is async: it loads the `Renderer` (and, only when
+ * `webComponents` are declared, `TemplesComponent`) with `await import()` after
+ * the DOM globals exist. Each call renders the parsed document with the provided
+ * data and returns the markup as an HTML string.
+ *
+ * @param source - HTML string: a whole document or a single root node.
  * @param options - Rendering options; all flags default to `false`.
- * @returns A render function producing an HTML string per data dictionary.
+ * @returns An async render function producing an HTML string per data dictionary.
  */
 export const prepare = (source: string, options: PrepareOptions = {}): PreparedRender => {
-	const dom = parseHTML(source) as unknown as Record<string, unknown>;
-
-	for (const key of DOM_GLOBALS) {
-		const value = dom[key];
-
-		if (value !== undefined && (globalThis as Record<string, unknown>)[key] === undefined) {
-			(globalThis as Record<string, unknown>)[key] = value;
-		}
-	}
-
-	// `component.ts` declares `class TemplesComponent extends HTMLElement`, so it
-	// must load only after `HTMLElement` exists. `engine.ts` is imported
-	// statically; it touches no DOM at module load.
-	const { TemplesComponent: TComponent } = require("./component") as {
-		TemplesComponent: typeof TemplesComponent;
+	const dom = parseHTML(source) as unknown as {
+		document: {
+			documentElement: Element | null;
+			head: Element;
+			toString: () => string;
+			createElement: (tag: string) => Element & { textContent: string };
+		};
 	};
 
-	const components = options.webComponents ?? [];
+	const domWindow = dom as unknown as Record<string, unknown>;
 
-	for (const ctor of components) {
-		ctor.define();
+	const components = options.webComponents ?? [];
+	const isFullDocument = dom.document.documentElement?.tagName === "HTML";
+	const root = dom.document.documentElement;
+
+	// A non-document source must have exactly one root element.
+	if (!isFullDocument && root !== null) {
+		const container = dom.document.createElement("div");
+		container.innerHTML = source.trim();
+
+		if (container.children.length > 1) {
+			throw new Error("Template string must have a single root element");
+		}
 	}
 
-	// Validate the source has a single root element before returning.
-	new Renderer(source);
+	let renderer: { rootElt: Element; render: (data: TemplesData) => Element } | null = null;
 
-	return (data: TemplesData): string => {
-		TComponent.globalStore = data;
+	return async (data: TemplesData): Promise<string> => {
+		// Scope the DOM globals to this render call, then restore them so the
+		// mutation does not leak into the surrounding environment.
+		const previous = new Map<string, unknown>();
 
-		const renderer = new Renderer(source);
-
-		if (components.length > 0) {
-			document.body.appendChild(renderer.rootElt);
+		for (const key of DOM_GLOBALS) {
+			previous.set(key, (globalThis as Record<string, unknown>)[key]);
 		}
 
-		renderer.render(data);
+		for (const key of DOM_GLOBALS) {
+			const value = domWindow[key];
 
-		if (options.removeDataBinding === true) {
-			unwrapComponents(renderer.rootElt, TComponent);
+			if (value !== undefined) {
+				(globalThis as Record<string, unknown>)[key] = value;
+			}
 		}
 
-		const html = renderer.toHtml();
+		try {
+			const { Renderer } = await import("./engine");
 
-		if (components.length > 0) {
-			renderer.rootElt.remove();
+			let TComponent: typeof TemplesComponent | undefined;
+
+			if (components.length > 0) {
+				const mod = await import("./component");
+				TComponent = mod.TemplesComponent;
+
+				for (const ctor of components) {
+					ctor.define({ globalStore: data });
+				}
+			}
+
+			if (root === null) return "";
+
+			if (renderer === null) {
+				renderer = new Renderer(root);
+			}
+
+			renderer.render(data);
+
+			if (options.removeDataBinding === true && TComponent !== undefined) {
+				unwrapComponents(renderer.rootElt, TComponent);
+			}
+
+			const style = components
+				.map((ctor) => ctor.css)
+				.filter((value) => value !== "")
+				.join("\n");
+
+			if (isFullDocument) {
+				if (style !== "") {
+					const styleEl = dom.document.createElement("style");
+					styleEl.textContent = style;
+					dom.document.head.appendChild(styleEl);
+				}
+
+				return dom.document.toString();
+			}
+
+			// A fragment is a single node; linkedom's synthetic head (which holds
+			// the component `<template>` and, if any, a `<style>`) must not leak
+			// into it.
+			dom.document.head.remove();
+
+			return (style !== "" ? `<style>${style}</style>` : "") + renderer.rootElt.outerHTML;
+		} finally {
+			for (const [key, value] of previous) {
+				if (value === undefined) {
+					delete (globalThis as Record<string, unknown>)[key];
+				} else {
+					(globalThis as Record<string, unknown>)[key] = value;
+				}
+			}
 		}
-
-		const css = components
-			.map((ctor) => ctor.css)
-			.filter((value) => value !== "")
-			.join("\n");
-		const style = css !== "" ? `<style>${css}</style>` : "";
-
-		return style + html;
 	};
 };
 

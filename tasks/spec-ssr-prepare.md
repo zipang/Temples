@@ -50,10 +50,18 @@ export interface PrepareOptions {
   webComponents?: typeof TemplesComponent[];
 }
 
-export type PreparedRender = (data: TemplesData) => string;
+export type PreparedRender = (data: TemplesData) => Promise<string>;
 
 export function prepare(source: string, options: PrepareOptions = {}): PreparedRender;
 ```
+
+`render(data)` is async: `prepare()` parses the source with linkedom and
+returns a function that loads the `Renderer` (and, only when `webComponents` is
+declared, `TemplesComponent`) with `await import()`. Loading is deferred until
+after the linkedom DOM globals are installed on `globalThis`, so the component
+class (`extends HTMLElement`) evaluates against a real DOM. The globals are
+restored after each render call so the mutation does not leak into the
+surrounding environment.
 
 - `source`: an HTML string with exactly one root element. A fragment or a whole
   page whose root is a single element (e.g. `<html>`) is allowed. A source with

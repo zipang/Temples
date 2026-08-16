@@ -2,6 +2,9 @@
 	"name": "temples-1.0",
 	"version": "0.0.0",
 	"type": "module",
+	"sideEffects": [
+		"./dist/ssr.js"
+	],
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	"exports": {
@@ -18,7 +21,7 @@
 		"format:check": "biome format .",
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
-		"build": "tsc --noEmit && bun build index.ts src/engine.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\"",
+		"build": "tsc --noEmit && bun build src/index.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\"",
 		"demo": "bun example/index.html"
 	},
 	"devDependencies": {
