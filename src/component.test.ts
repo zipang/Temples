@@ -196,3 +196,224 @@ describe("TemplesComponent.define", () => {
 		list.remove();
 	});
 });
+
+describe("TemplesComponent events", () => {
+	test("registers a single document listener per event type", () => {
+		const original = document.addEventListener;
+		const added: string[] = [];
+		const spy = ((
+			type: string,
+			listener: EventListenerOrEventListenerObject | null,
+			options?: AddEventListenerOptions | boolean
+		) => {
+			added.push(type);
+			original.call(document, type, listener, options);
+		}) as typeof document.addEventListener;
+
+		document.addEventListener = spy;
+
+		try {
+			class Alpha extends TemplesComponent {
+				static tag = "event-alpha";
+				static template = "<b class='x'>a</b>";
+				static events = { "dblclick .x": () => undefined };
+				state = reactive({});
+			}
+
+			class Beta extends TemplesComponent {
+				static tag = "event-beta";
+				static template = "<i class='x'>b</i>";
+				static events = { "dblclick .x": () => undefined };
+				state = reactive({});
+			}
+
+			Alpha.define();
+			Beta.define();
+
+			expect(added.filter((type) => type === "dblclick")).toHaveLength(1);
+		} finally {
+			document.addEventListener = original;
+		}
+	});
+
+	test("passes the event and the component to the handler", () => {
+		const captured: Array<{ evt: Event; cmpnt: TemplesComponent }> = [];
+
+		class Counter extends TemplesComponent {
+			static tag = "event-counter";
+			static template = "<input class='field'><button class='inc'>+1</button>";
+			static events = {
+				"click .inc": (evt: Event, cmpnt: TemplesComponent) => {
+					captured.push({ evt, cmpnt });
+				}
+			};
+			state = reactive({ count: 0 });
+		}
+
+		Counter.define();
+
+		const elt = document.createElement("event-counter") as Counter;
+		document.body.appendChild(elt);
+
+		elt.querySelector("button.inc")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(captured).toHaveLength(1);
+		expect(captured[0]?.cmpnt).toBe(elt);
+		expect(captured[0]?.evt).toBeInstanceOf(Event);
+		elt.remove();
+	});
+
+	test("handlers receive a live event with preventDefault and target access", () => {
+		let defaultPrevented = false;
+		let inputValue = "";
+
+		class Form extends TemplesComponent {
+			static tag = "event-form";
+			static template = "<form class='form'><input class='field' value='hi'></form>";
+			static events = {
+				"submit .form": (evt: Event) => {
+					evt.preventDefault();
+					defaultPrevented = evt.defaultPrevented;
+					inputValue = (evt.target as HTMLFormElement).querySelector("input")?.value ?? "";
+				}
+			};
+			state = reactive({});
+		}
+
+		Form.define();
+
+		const elt = document.createElement("event-form") as Form;
+		document.body.appendChild(elt);
+
+		elt
+			.querySelector("form")
+			?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+
+		expect(defaultPrevented).toBe(true);
+		expect(inputValue).toBe("hi");
+		elt.remove();
+	});
+
+	test("a single document listener serves every instance", () => {
+		const clicked: TemplesComponent[] = [];
+
+		class Counter extends TemplesComponent {
+			static tag = "event-multi";
+			static template = "<button class='inc'>+1</button>";
+			static events = {
+				"click .inc": (_evt: Event, cmpnt: TemplesComponent) => clicked.push(cmpnt)
+			};
+			state = reactive({ count: 0 });
+		}
+
+		Counter.define();
+
+		const first = document.createElement("event-multi") as Counter;
+		const second = document.createElement("event-multi") as Counter;
+
+		document.body.appendChild(first);
+		document.body.appendChild(second);
+
+		first.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(clicked).toHaveLength(1);
+		expect(clicked[0]).toBe(first);
+
+		second.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(clicked).toHaveLength(2);
+		expect(clicked[1]).toBe(second);
+
+		first.remove();
+		second.remove();
+	});
+
+	test("resolves the closest component and ignores outer handlers", () => {
+		const innerHits: TemplesComponent[] = [];
+		const outerHits: TemplesComponent[] = [];
+
+		class Inner extends TemplesComponent {
+			static tag = "event-inner";
+			static template = "<button class='act'>go</button>";
+			static events = {
+				"click .act": (_evt: Event, cmpnt: TemplesComponent) => innerHits.push(cmpnt)
+			};
+			state = reactive({});
+		}
+
+		class Outer extends TemplesComponent {
+			static tag = "event-outer";
+			static template = "<event-inner></event-inner>";
+			static events = {
+				"click .act": (_evt: Event, cmpnt: TemplesComponent) => outerHits.push(cmpnt)
+			};
+			state = reactive({});
+		}
+
+		Inner.define();
+		Outer.define();
+
+		const outer = document.createElement("event-outer") as Outer;
+		document.body.appendChild(outer);
+
+		const inner = outer.querySelector("event-inner") as Inner;
+		inner.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(innerHits).toHaveLength(1);
+		expect(innerHits[0]).toBe(inner);
+		expect(outerHits).toHaveLength(0);
+
+		outer.remove();
+	});
+
+	test("ignores events that do not match the selector", () => {
+		let hits = 0;
+
+		class Counter extends TemplesComponent {
+			static tag = "event-mismatch";
+			static template = "<button class='other'>x</button>";
+			static events = {
+				"click .inc": () => {
+					hits++;
+				}
+			};
+			state = reactive({});
+		}
+
+		Counter.define();
+
+		const elt = document.createElement("event-mismatch") as Counter;
+		document.body.appendChild(elt);
+
+		elt.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(hits).toBe(0);
+		elt.remove();
+	});
+
+	test("ignores events from outside any component", () => {
+		let hits = 0;
+
+		class Counter extends TemplesComponent {
+			static tag = "event-outside";
+			static template = "<button class='inc'>+1</button>";
+			static events = {
+				"click .inc": () => {
+					hits++;
+				}
+			};
+			state = reactive({});
+		}
+
+		Counter.define();
+
+		const stray = document.createElement("button");
+
+		stray.className = "inc";
+		document.body.appendChild(stray);
+		stray.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(hits).toBe(0);
+		stray.remove();
+	});
+});

@@ -1,9 +1,5 @@
 import { Renderer, type TemplesData } from "./engine";
 import { reactive, subscribe } from "./reactive";
-import { type EventMap, registerEvents } from "./register-events";
-
-export type { EventMap };
-export { registerEvents };
 
 /**
  * Type an observed attribute's value as it flows into `state`.
@@ -13,6 +9,32 @@ export { registerEvents };
  * or array literal.
  */
 export type AttributeType = "boolean" | "number" | "json" | "string";
+
+/**
+ * Event handler invoked by a declarative event binding.
+ *
+ * The handler receives the original `Event` and the component instance whose
+ * event map declared the binding.
+ */
+export type EventHandler = (event: Event, component: TemplesComponent) => void;
+
+/**
+ * Declarative map of event bindings.
+ *
+ * Each key has the form `"eventType selector"`, e.g. `"click .add-btn"`, and
+ * maps to the handler run when an event of that type bubbles from an element
+ * matching the selector inside the component.
+ */
+export type EventMap = Record<string, EventHandler>;
+
+/**
+ * Document-level listeners, one per event type, shared by every component.
+ *
+ * The listener resolves the closest `TemplesComponent` ancestor of the event
+ * target and dispatches to that component's own `events` map, so a single
+ * listener serves all instances of all classes that use the same event type.
+ */
+const documentListeners = new Map<string, (event: Event) => void>();
 
 /**
  * Base class for declarative Web Components with reactive state.
@@ -58,7 +80,6 @@ export class TemplesComponent extends HTMLElement {
 
 	private renderer: Renderer | null = null;
 	private unsubscribeState: (() => void) | null = null;
-	private cleanupEvents: (() => void) | null = null;
 
 	constructor() {
 		super();
@@ -68,14 +89,112 @@ export class TemplesComponent extends HTMLElement {
 	/**
 	 * Register the custom element.
 	 *
-	 * Ensures a `<template id="tag">` exists in the document head, then calls
+	 * Ensures a `<template id="tag">` exists in the document head, registers a
+	 * document-level listener for every event type in `events`, then calls
 	 * `customElements.define(this.tag, this)`.
 	 */
 	static define(): void {
 		const ctor = this as typeof TemplesComponent;
 
 		TemplesComponent.resolveTemplate(ctor);
+		TemplesComponent.registerEventTypes(ctor);
 		customElements.define(ctor.tag, ctor);
+	}
+
+	/**
+	 * Register one document listener per event type declared in the class map.
+	 *
+	 * Listeners are deduplicated by event type across all component classes, so
+	 * a click handler is attached to the document exactly once no matter how
+	 * many classes or instances use it.
+	 *
+	 * @param ctor - The component class whose `events` map to register.
+	 */
+	private static registerEventTypes(ctor: typeof TemplesComponent): void {
+		for (const binding of Object.keys(ctor.events)) {
+			const type = binding.slice(0, binding.indexOf(" "));
+
+			if (!documentListeners.has(type)) {
+				const listener = (event: Event): void => TemplesComponent.dispatch(type, event);
+
+				document.addEventListener(type, listener);
+				documentListeners.set(type, listener);
+			}
+		}
+	}
+
+	/**
+	 * Handle a document-level event for one event type.
+	 *
+	 * The closest `TemplesComponent` ancestor of the event target owns the
+	 * event: only its `events` map is consulted, and a missing selector match
+	 * there leaves outer components untouched.
+	 *
+	 * @param type - The event type this listener was registered for.
+	 * @param event - The event that bubbled to the document.
+	 */
+	private static dispatch(type: string, event: Event): void {
+		const component = TemplesComponent.resolveComponent(event);
+
+		if (component === null) return;
+
+		const ctor = component.constructor as typeof TemplesComponent;
+
+		for (const [binding, handler] of Object.entries(ctor.events)) {
+			const separator = binding.indexOf(" ");
+			const bindingType = binding.slice(0, separator);
+
+			if (bindingType !== type) continue;
+
+			const selector = binding.slice(separator + 1).trim();
+
+			if (TemplesComponent.matchesSelector(event, selector, component)) {
+				handler(event, component);
+			}
+		}
+	}
+
+	/**
+	 * Find the closest `TemplesComponent` ancestor of the event target.
+	 *
+	 * Walks the composed path from the target upward and returns the first
+	 * element that is a component instance, or null when the event originates
+	 * outside every component.
+	 *
+	 * @param event - The event whose target to resolve.
+	 * @returns The closest component ancestor, or null.
+	 */
+	private static resolveComponent(event: Event): TemplesComponent | null {
+		for (const node of event.composedPath()) {
+			if (node instanceof TemplesComponent) return node;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Match a selector against the event target within the component subtree.
+	 *
+	 * Walks the composed path from the target up to the component itself; the
+	 * first element that matches wins, and the component is the last node
+	 * considered.
+	 *
+	 * @param event - The event whose target to match.
+	 * @param selector - The CSS selector from the event binding.
+	 * @param component - The owning component that bounds the match.
+	 * @returns True when an element from the target up to the component matches.
+	 */
+	private static matchesSelector(
+		event: Event,
+		selector: string,
+		component: TemplesComponent
+	): boolean {
+		for (const node of event.composedPath()) {
+			if (node === component) return component.matches(selector);
+			if (node instanceof Element && node.matches(selector)) return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -104,7 +223,7 @@ export class TemplesComponent extends HTMLElement {
 	}
 
 	/**
-	 * Render the state, seed attributes, and attach events.
+	 * Render the state and seed the observed attributes.
 	 *
 	 * The template content is rendered into an internal container and then
 	 * adopted into the host. The host's own attributes are left untouched so a
@@ -129,21 +248,18 @@ export class TemplesComponent extends HTMLElement {
 		}
 
 		this.unsubscribeState = subscribe(this.state, () => this.rerender());
-		this.cleanupEvents = registerEvents(this, ctor.events);
 		this.rerender();
 	}
 
 	/**
-	 * Release the event listeners, the state subscription, and the children.
+	 * Release the state subscription and the children.
+	 *
+	 * Document-level event listeners persist for the lifetime of the document
+	 * and are not tied to any single instance.
 	 *
 	 * Called by the browser when the element disconnects from the DOM.
 	 */
 	disconnectedCallback(): void {
-		if (this.cleanupEvents !== null) {
-			this.cleanupEvents();
-			this.cleanupEvents = null;
-		}
-
 		if (this.unsubscribeState !== null) {
 			this.unsubscribeState();
 			this.unsubscribeState = null;

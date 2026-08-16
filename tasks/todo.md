@@ -80,10 +80,10 @@ Follow `test-driven-development`: failing test first, then implementation.
 
 ## Phase 5: Events & messaging
 
-- [ ] **T11: registerEvents() — (event, host) signature**
-  - Acceptance: Handlers receive `(event, host)`; `host` is typed `TemplesComponent`; `"eventType selector"` keys are validated at registration (not lazily at event time).
-  - Verify: Unit test registers a `click .btn` handler, simulates a click, asserts the handler ran with `(event, host)`. Then calls cleanup, clicks again, and asserts the handler is NOT called.
-  - Files: `src/register-events.ts`, `src/register-events.test.ts`
+- [x] **T11: Document-level event delegation with (event, component)**
+  - Acceptance: Handlers receive `(event, component)` where `component` is a `TemplesComponent`. Each event type registers **one** document-level listener shared by every component class and instance; the listener resolves the closest `TemplesComponent` ancestor of the event target and consults only that component's `events` map (outer components are untouched). Selector matching is scoped to the resolved component. `registerEvents` is removed from the public API.
+  - Verify: Unit test registers `click .btn` and `submit .form` handlers, asserts `(event, component)` and live-event behavior (`preventDefault`, `target`). Tests cover: one listener per event type across two classes, two instances served by one listener, closest-component resolution with outer handlers ignored, selector mismatch, and events outside any component.
+  - Files: `src/component.ts`, `src/component.test.ts`
 
 - [ ] **T12: emit()/on() messaging**
   - Acceptance: `this.emit(name, detail)` dispatches a bubbling `CustomEvent`; `this.on(name, handler)` subscribes and returns an unsubscribe function. Works across sibling components.
@@ -120,6 +120,6 @@ Follow `test-driven-development`: failing test first, then implementation.
   - Files: `example/index.html`, `example/components/*.js`, `example/demo.css`, `package.json`.
 
 - [ ] **T16: README + example/README review**
-  - Acceptance: README reflects the reactive-state API, `(event, host)` handlers, `emit`/`on`, keyed reconciliation, and the no-bundling example. Cross-check every code example.
+  - Acceptance: README reflects the reactive-state API, `(event, component)` handlers, `emit`/`on`, keyed reconciliation, and the no-bundling example. Cross-check every code example.
   - Verify: Read the README against the actual code. Cross-check every code example in the README against the real implementation.
   - Files: `README.md`, `example/README.md`
