@@ -417,3 +417,141 @@ describe("TemplesComponent events", () => {
 		stray.remove();
 	});
 });
+
+describe("TemplesComponent messaging", () => {
+	test("emits a tag-prefixed message that a different class can subscribe to", () => {
+		const received: CustomEvent[] = [];
+
+		class TaskItem extends TemplesComponent {
+			static tag = "msg-item-a";
+			static template = "<li>task</li>";
+			state = reactive({});
+		}
+
+		class TaskList extends TemplesComponent {
+			static tag = "msg-list-a";
+			static template = "<ul></ul>";
+			state = reactive({});
+		}
+
+		TaskItem.define();
+		TaskList.define();
+
+		const item = document.createElement("msg-item-a") as TaskItem;
+		const list = document.createElement("msg-list-a") as TaskList;
+
+		list.on("msg-item-a:completed", (evt) => received.push(evt));
+		item.emit("completed", { id: 1 });
+
+		expect(received).toHaveLength(1);
+		expect(received[0]?.type).toBe("msg-item-a:completed");
+		expect(received[0]?.detail).toEqual({ id: 1 });
+	});
+
+	test("separates same local name emitted by different classes", () => {
+		const items: unknown[] = [];
+		const notes: unknown[] = [];
+
+		class TaskItem extends TemplesComponent {
+			static tag = "msg-item-b";
+			static template = "<li></li>";
+			state = reactive({});
+		}
+
+		class TaskNote extends TemplesComponent {
+			static tag = "msg-note-b";
+			static template = "<p></p>";
+			state = reactive({});
+		}
+
+		TaskItem.define();
+		TaskNote.define();
+
+		const item = document.createElement("msg-item-b") as TaskItem;
+		const note = document.createElement("msg-note-b") as TaskNote;
+
+		item.on("msg-item-b:changed", (evt) => items.push(evt.detail));
+		note.on("msg-note-b:changed", (evt) => notes.push(evt.detail));
+
+		item.emit("changed", "item-a");
+		note.emit("changed", "note-b");
+
+		expect(items).toEqual(["item-a"]);
+		expect(notes).toEqual(["note-b"]);
+	});
+
+	test("does not deliver to a listener on the unprefixed name", () => {
+		let hits = 0;
+
+		class TaskItem extends TemplesComponent {
+			static tag = "msg-item-c";
+			static template = "<li></li>";
+			state = reactive({});
+		}
+
+		TaskItem.define();
+
+		const item = document.createElement("msg-item-c") as TaskItem;
+
+		item.on("completed", () => {
+			hits++;
+		});
+		item.emit("completed");
+
+		expect(hits).toBe(0);
+	});
+
+	test("on returns an unsubscribe function that stops delivery", () => {
+		let hits = 0;
+
+		class Emitter extends TemplesComponent {
+			static tag = "msg-emitter";
+			static template = "<i></i>";
+			state = reactive({});
+		}
+
+		Emitter.define();
+
+		const emitter = document.createElement("msg-emitter") as Emitter;
+
+		const off = emitter.on("msg-emitter:ping", () => {
+			hits++;
+		});
+
+		emitter.emit("ping");
+		expect(hits).toBe(1);
+
+		off();
+		emitter.emit("ping");
+		expect(hits).toBe(1);
+	});
+
+	test("messaging works without connecting the components to the DOM", () => {
+		let hits = 0;
+
+		class TaskItem extends TemplesComponent {
+			static tag = "msg-item-d";
+			static template = "<li></li>";
+			state = reactive({});
+		}
+
+		class TaskList extends TemplesComponent {
+			static tag = "msg-list-d";
+			static template = "<ul></ul>";
+			state = reactive({});
+		}
+
+		TaskItem.define();
+		TaskList.define();
+
+		const item = document.createElement("msg-item-d") as TaskItem;
+		const list = document.createElement("msg-list-d") as TaskList;
+
+		list.on("msg-item-d:completed", () => {
+			hits++;
+		});
+		item.emit("completed");
+
+		expect(hits).toBe(1);
+	});
+});

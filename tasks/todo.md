@@ -85,10 +85,10 @@ Follow `test-driven-development`: failing test first, then implementation.
   - Verify: Unit test registers `click .btn` and `submit .form` handlers, asserts `(event, component)` and live-event behavior (`preventDefault`, `target`). Tests cover: one listener per event type across two classes, two instances served by one listener, closest-component resolution with outer handlers ignored, selector mismatch, and events outside any component.
   - Files: `src/component.ts`, `src/component.test.ts`
 
-- [ ] **T12: emit()/on() messaging**
-  - Acceptance: `this.emit(name, detail)` dispatches a bubbling `CustomEvent`; `this.on(name, handler)` subscribes and returns an unsubscribe function. Works across sibling components.
-  - Verify: Unit test emits from one component and asserts a sibling's `on` handler receives the detail; unsubscribes and asserts it stops.
-  - Files: `src/component.ts`, tests.
+- [x] **T12: emit()/on() messaging over a shared event bus**
+  - Acceptance: `this.emit(name, detail)` delivers a message named `<tag>:<name>` on a shared bus; `this.on("<tag>:<name>", handler)` subscribes and returns an unsubscribe function. Any component may talk to any other regardless of class or DOM position (loose coupling); the tag prefix keeps classes from colliding on the same local name.
+  - Verify: Unit test emits from one class and asserts a different class's `on` handler receives the message and its detail; tests cover tag-prefix separation of the same local name, no delivery to the unprefixed name, unsubscribe, and messaging without connecting to the DOM.
+  - Files: `src/component.ts`, `src/component.test.ts`
 
 ## Phase 6: jQuery plugin
 

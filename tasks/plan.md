@@ -60,7 +60,7 @@ A thin consumer of the core engine. Contains:
 - Rendering targets an internal container rather than the host element, so a parent component can feed a child through `data-bind` without the child's renderer stripping those attributes.
 - Lifecycle hooks — `connectedCallback`, `disconnectedCallback`, `attributeChangedCallback`.
 - `this.state` — a reactive proxy; mutations re-render automatically.
-- `emit(name, detail)` / `on(name, handler)` — messaging over bubbling `CustomEvent`.
+- `emit(name, detail)` / `on(name, handler)` — messaging over a shared event bus. `emit` names the message `<tag>:<name>`; `on("<tag>:<name>", handler)` subscribes and returns an unsubscribe function.
 - Attribute values are coerced via `attributeTypes` and written into `state`.
 
 The old `this.data`, `render()`, and `update()` public methods are **removed**. State lives in `this.state`; rendering is driven by reactive mutations.
@@ -111,7 +111,7 @@ The reference implementation is a multi-component TODO app that runs against the
 - The output files are `dist/index.js`, `dist/engine.js`, `dist/ssr.js`, `dist/jquery.js`.
 
 **Public exports (decision)**
-- `src/index.ts` exports the full public API: `Renderer`, `TemplesComponent`, `reactive`, `EventMap`, `EventHandler`, and the data types.
+- `src/index.ts` exports the full public API: `Renderer`, `TemplesComponent`, `reactive`, `EventMap`, `EventHandler`, `MessageHandler`, and the data types.
 - `package.json` declares `"sideEffects": false` so bundlers can tree-shake.
 - The `exports` map points to the built `.js` files in `dist/`, never to TypeScript sources:
   - `.` → `./dist/index.js`
@@ -209,7 +209,7 @@ Resolved during the plan review:
 3. **Component SSR** (RESOLVED — not included) — `TemplesComponent` stays browser-only. The standalone engine covers the SSG use case.
 4. **State model** (RESOLVED) — Reactive proxy. `this.state` is a deep `Proxy`; mutations re-render automatically. The old `this.data` + `update(path, value)` model is removed.
 5. **Event handler signature** (RESOLVED) — Handlers receive `(event, component)`, the `Event` first and the resolved component second. Registration is document-level: one listener per event type, resolving the closest component ancestor.
-6. **Inter-component messaging** (RESOLVED) — `emit(name, detail)` dispatches a bubbling `CustomEvent`; `on(name, handler)` subscribes and returns an unsubscribe function.
+6. **Inter-component messaging** (RESOLVED) — A shared module-level event bus. `emit(name, detail)` delivers a message named `<tag>:<name>`; `on("<tag>:<name>", handler)` subscribes and returns an unsubscribe function. Any component can talk to any other regardless of class or DOM position; the tag prefix avoids name collisions.
 7. **List rendering** (RESOLVED) — Keyed reconciliation in `data-iterate`. Rows are tracked by key (`data-key` or item `id`).
 8. **Attribute value types** (RESOLVED) — Observed attributes write raw strings into `state` by default; an optional `static attributeTypes` map coerces `boolean`/`number`/`json` values.
 9. **`define()` shape** (RESOLVED) — Static `tag`/`template`/`events`/`observedAttributes`/`attributeTypes` fields; `TodoApp.define()` registers the element. The redundant class parameter is dropped.

@@ -28,6 +28,14 @@ export type EventHandler = (event: Event, component: TemplesComponent) => void;
 export type EventMap = Record<string, EventHandler>;
 
 /**
+ * Handler for a message delivered by the shared event bus.
+ *
+ * The handler receives the `CustomEvent` whose `type` is the fully qualified
+ * message name and whose `detail` holds the emitted payload.
+ */
+export type MessageHandler = (event: CustomEvent) => void;
+
+/**
  * Document-level listeners, one per event type, shared by every component.
  *
  * The listener resolves the closest `TemplesComponent` ancestor of the event
@@ -35,6 +43,35 @@ export type EventMap = Record<string, EventHandler>;
  * listener serves all instances of all classes that use the same event type.
  */
 const documentListeners = new Map<string, (event: Event) => void>();
+
+/**
+ * Shared messaging bus, mapping a fully qualified message name to its handlers.
+ *
+ * Every component emits and subscribes through the same bus, so any component
+ * can talk to any other regardless of class or DOM position. Message names are
+ * prefixed with the emitting tag (`task-item:completed`) to keep classes from
+ * colliding on the same local name.
+ */
+const messageHandlers = new Map<string, Set<MessageHandler>>();
+
+/**
+ * Deliver a message to every subscribed handler.
+ *
+ * A snapshot of the handler set is iterated so a handler that unsubscribes
+ * during dispatch does not affect the current delivery.
+ *
+ * @param type - The fully qualified message name.
+ * @param detail - The payload delivered on the message's `detail` property.
+ */
+const dispatchMessage = (type: string, detail: unknown): void => {
+	const handlers = messageHandlers.get(type);
+
+	if (handlers === undefined) return;
+
+	const event = new CustomEvent(type, { detail });
+
+	for (const handler of [...handlers]) handler(event);
+};
 
 /**
  * Base class for declarative Web Components with reactive state.
@@ -282,6 +319,48 @@ export class TemplesComponent extends HTMLElement {
 	attributeChangedCallback(name: string, _oldValue: string | null, newValue: string | null): void {
 		this.state[name] = this.coerceAttribute(name, newValue);
 		this.rerender();
+	}
+
+	/**
+	 * Emit a message on the shared event bus.
+	 *
+	 * The message is delivered under the fully qualified name `<tag>:<name>`, so
+	 * an emitter writes a short local name and classes never collide. Subscribers
+	 * elsewhere use `on("<tag>:<name>", handler)`.
+	 *
+	 * @param name - The local message name, prefixed with the emitting tag.
+	 * @param detail - Optional payload delivered on the message's `detail`.
+	 */
+	emit(name: string, detail?: unknown): void {
+		const ctor = this.constructor as typeof TemplesComponent;
+
+		dispatchMessage(`${ctor.tag}:${name}`, detail);
+	}
+
+	/**
+	 * Subscribe to a message on the shared event bus.
+	 *
+	 * The name is fully qualified, e.g. `on("task-item:completed", handler)`.
+	 * Messaging is loose: the handler is stored on the shared bus, not tied to
+	 * the DOM, so any component may subscribe to any other class's messages.
+	 *
+	 * @param name - The fully qualified message name to listen for.
+	 * @param handler - The handler invoked with the delivered `CustomEvent`.
+	 * @returns An unsubscribe function that stops delivery.
+	 */
+	on(name: string, handler: MessageHandler): () => void {
+		let set = messageHandlers.get(name);
+
+		if (set === undefined) {
+			set = new Set();
+			messageHandlers.set(name, set);
+		}
+
+		const handlers = set;
+
+		handlers.add(handler);
+
+		return () => handlers.delete(handler);
 	}
 
 	/**
