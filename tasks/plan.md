@@ -55,7 +55,9 @@ A deep `Proxy` wrapper that notifies subscribers when any nested property or arr
 ### 4. `TemplesComponent` base class (`src/component.ts`)
 A thin consumer of the core engine. Contains:
 - `static tag` / `static template` / `static events` / `static observedAttributes` / `static attributeTypes` fields.
-- `static define()` — parses the template once and calls `customElements.define(this.tag, this)`.
+- `static define()` — ensures a `<template id="tag">` exists in the document head, then calls `customElements.define(this.tag, this)`.
+- Templates live in the document head, keyed by tag name (`template#<tag>`), so they are inspectable and never re-parsed. `define()` inserts them; `connectedCallback` clones `template.content` into the component body.
+- Rendering targets an internal container rather than the host element, so a parent component can feed a child through `data-bind` without the child's renderer stripping those attributes.
 - Lifecycle hooks — `connectedCallback`, `disconnectedCallback`, `attributeChangedCallback`.
 - `this.state` — a reactive proxy; mutations re-render automatically.
 - `emit(name, detail)` / `on(name, handler)` — messaging over bubbling `CustomEvent`.

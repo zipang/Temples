@@ -62,18 +62,19 @@ Follow `test-driven-development`: failing test first, then implementation.
 
 ## Phase 4: Reactive state + Web Component
 
-- [ ] **T9: reactive() proxy utility**
+- [x] **T9: reactive() proxy utility**
   - Acceptance: `reactive(target)` returns a deep proxy; mutating nested properties/arrays notifies subscribers. Subscribers can be attached and detached.
   - Verify: Unit test mutates a nested property and an array element, asserting the subscriber fired; detaches and asserts it stops firing.
   - Files: `src/reactive.ts`, `src/reactive.test.ts`
 
-- [ ] **T10: TemplesComponent reactive state + define()**
+- [x] **T10: TemplesComponent reactive state + define()**
   - Acceptance:
     - `static tag`, `static template`, `static events`, `static observedAttributes`, `static attributeTypes` fields.
     - `TodoApp.define()` parses the template once and calls `customElements.define(this.tag, this)`.
     - `this.state` is a reactive proxy; any mutation re-renders (full re-render + keyed reconciliation).
     - Observed attributes write into `state` (coerced via `attributeTypes`); attribute change → state → render.
     - The old `update()`/`render()` public methods and `this.data` are removed.
+    - Templates live in the document head as `<template id="tag">`; `define()` inserts them, components clone their content into the body.
   - Verify: Unit test defines a component, mutates `state`, asserts re-render; sets an attribute, asserts coerced state and re-render.
   - Files: `src/component.ts`, `src/component.test.ts`
 
