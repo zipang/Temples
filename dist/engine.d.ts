@@ -16,7 +16,7 @@ export type RenderValue = string | number | boolean | null | undefined;
  * error.
  */
 export interface TemplesData {
-    [key: string]: TemplesDataValue;
+	[key: string]: TemplesDataValue;
 }
 /**
  * A value held in a Temples data dictionary.
@@ -26,7 +26,11 @@ export interface TemplesData {
  * with its owner dictionary as `this`, so methods can reference sibling
  * properties. Arrays feed `data-iterate`.
  */
-export type TemplesDataValue = RenderValue | ((this: TemplesData) => RenderValue) | TemplesData | TemplesDataValue[];
+export type TemplesDataValue =
+	| RenderValue
+	| ((this: TemplesData) => RenderValue)
+	| TemplesData
+	| TemplesDataValue[];
 /**
  * Standalone, DOM-based renderer for a single template.
  *
@@ -35,49 +39,49 @@ export type TemplesDataValue = RenderValue | ((this: TemplesData) => RenderValue
  * the provided data.
  */
 export declare class Renderer {
-    readonly rootElt: Element;
-    private readonly bindings;
-    constructor(source: Element | string);
-    /**
-     * Render the bindings whose paths are present in the provided data.
-     *
-     * Every binding is applied when its path resolves in the data. A path
-     * absent from the data keeps its current state. A partial dictionary
-     * re-renders only the paths it carries, while a full dictionary
-     * re-renders every present path.
-     *
-     * @param data - Data dictionary; the paths it carries are rendered.
-     * @returns The rendered root element.
-     */
-    render(data: TemplesData): Element;
-    /**
-     * Update a single path and re-render only the bindings bound to it.
-     *
-     * The path is written into a fresh nested dictionary, e.g. `"article.title"`
-     * yields `{ article: { title: value } }`, and only the operations bound to
-     * that exact path are applied. All other bindings keep their current state.
-     *
-     * @param path - Dotted path to the property, e.g. `"article.title"`.
-     * @param value - The value to assign to the property.
-     * @returns The rendered root element.
-     */
-    update(path: string, value: TemplesDataValue): Element;
-    /**
-     * Serialize the rendered root to an HTML string.
-     *
-     * The root element is the template root, so its outer HTML carries every
-     * rendered binding. Control attributes were removed at construction, so the
-     * markup stays clean.
-     *
-     * @returns The serialized HTML of the root element.
-     */
-    toHtml(): string;
-    /**
-     * Serialize the rendered root to an HTML string.
-     *
-     * Synonym for `toHtml()`.
-     *
-     * @returns The serialized HTML of the root element.
-     */
-    renderToString(): string;
+	readonly rootElt: Element;
+	private readonly bindings;
+	constructor(source: Element | string);
+	/**
+	 * Render the bindings whose paths are present in the provided data.
+	 *
+	 * Every binding is applied when its path resolves in the data. A path
+	 * absent from the data keeps its current state. A partial dictionary
+	 * re-renders only the paths it carries, while a full dictionary
+	 * re-renders every present path.
+	 *
+	 * @param data - Data dictionary; the paths it carries are rendered.
+	 * @returns The rendered root element.
+	 */
+	render(data: TemplesData): Element;
+	/**
+	 * Update a single path and re-render only the bindings bound to it.
+	 *
+	 * The path is written into a fresh nested dictionary, e.g. `"article.title"`
+	 * yields `{ article: { title: value } }`, and only the operations bound to
+	 * that exact path are applied. All other bindings keep their current state.
+	 *
+	 * @param path - Dotted path to the property, e.g. `"article.title"`.
+	 * @param value - The value to assign to the property.
+	 * @returns The rendered root element.
+	 */
+	update(path: string, value: TemplesDataValue): Element;
+	/**
+	 * Serialize the rendered root to an HTML string.
+	 *
+	 * The root element is the template root, so its outer HTML carries every
+	 * rendered binding. Control attributes were removed at construction, so the
+	 * markup stays clean.
+	 *
+	 * @returns The serialized HTML of the root element.
+	 */
+	toHtml(): string;
+	/**
+	 * Serialize the rendered root to an HTML string.
+	 *
+	 * Synonym for `toHtml()`.
+	 *
+	 * @returns The serialized HTML of the root element.
+	 */
+	renderToString(): string;
 }

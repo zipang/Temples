@@ -1,18 +1,27 @@
 {
-	"name": "temples-1.0",
-	"version": "0.0.0",
+	"name": "@temples",
+	"version": "0.9.0",
 	"type": "module",
 	"sideEffects": [
 		"./dist/ssr.js"
 	],
-	"main": "./dist/index.js",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./dist/index.js",
-		"./engine": "./dist/engine.js",
-		"./ssr": "./dist/ssr.js",
-		"./jquery": "./dist/jquery.js"
+		"./engine": {
+			"types": "./dist/engine.d.ts",
+			"default": "./dist/engine.js"
+		},
+		"./components": {
+			"types": "./dist/component.d.ts",
+			"default": "./dist/component.js"
+		},
+		"./ssr": {
+			"types": "./dist/ssr.d.ts",
+			"default": "./dist/ssr.js"
+		},
+		"./jquery": {
+			"types": "./dist/jquery.d.ts",
+			"default": "./dist/jquery.js"
+		}
 	},
 	"scripts": {
 		"dev": "bun --hot example/index.html",
@@ -22,7 +31,7 @@
 		"format:check": "biome format .",
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
-		"build": "tsc --noEmit && tsc -p tsconfig.build.json && bun build src/index.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\"",
+		"build": "tsc --noEmit && bun build src/component.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\" && tsc -p tsconfig.build.json && biome format --write dist",
 		"demo": "bun example/index.html"
 	},
 	"devDependencies": {

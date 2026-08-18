@@ -23,7 +23,11 @@ export declare const splitPath: (path: string) => string[];
  * @param defaultValue - Value returned when the path does not resolve.
  * @returns The value at the path, or the default value.
  */
-export declare const getProperty: <T>(source: object, path: string, defaultValue?: T) => T | undefined;
+export declare const getProperty: <T>(
+	source: object,
+	path: string,
+	defaultValue?: T
+) => T | undefined;
 /**
  * Tell whether a property path is present in the source.
  *
@@ -50,4 +54,8 @@ export declare const hasProperty: (source: object, path: string) => boolean;
  * @param value - The value to assign.
  * @returns The source object, for chaining.
  */
-export declare const setProperty: (source: Record<string, unknown>, path: string, value: unknown) => Record<string, unknown>;
+export declare const setProperty: (
+	source: Record<string, unknown>,
+	path: string,
+	value: unknown
+) => Record<string, unknown>;

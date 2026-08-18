@@ -366,32 +366,275 @@ var init_engine = __esm(() => {
 	]);
 });
 
-// src/jquery.ts
-init_engine();
-var resolveJQuery = () => {
-	const globalScope = globalThis;
-	const dollar = globalScope.$;
-	return dollar ?? globalScope.jQuery ?? null;
-};
-var jquery = resolveJQuery();
-if (jquery === null) {
-	throw new Error("temples/jquery requires jQuery to be loaded before importing the plugin");
-}
-var renderers = new WeakMap();
-var getRenderer = (el) => {
-	let renderer = renderers.get(el);
-	if (renderer === undefined) {
-		renderer = new Renderer(el);
-		renderers.set(el, renderer);
-	}
-	return renderer;
-};
-jquery.fn.temples = function (data) {
-	const elements = this.toArray();
-	const first = elements[0];
-	if (data === undefined) {
-		return first === undefined ? this : getRenderer(first);
-	}
-	for (const el of elements) getRenderer(el).render(data);
-	return this;
-};
+// src/reactive.ts
+var subscribers,
+	parents,
+	proxies,
+	proxySet,
+	notify = (target) => {
+		const set = subscribers.get(target);
+		if (set !== undefined) {
+			for (const subscriber of [...set]) subscriber();
+		}
+		const parent = parents.get(target);
+		if (parent !== undefined) notify(parent);
+	},
+	reactive = (target, parent) => {
+		const cached = proxies.get(target);
+		if (cached !== undefined) return cached;
+		if (proxySet.has(target)) return target;
+		const proxy = new Proxy(target, {
+			get(t, key, receiver) {
+				const value = Reflect.get(t, key, receiver);
+				return isObject(value) ? reactive(value, receiver) : value;
+			},
+			set(t, key, value, receiver) {
+				const written = Reflect.set(t, key, value, receiver);
+				if (written && !isArrayLength(t, key)) notify(receiver);
+				return written;
+			},
+			deleteProperty(t, key) {
+				const deleted = Reflect.deleteProperty(t, key);
+				if (deleted) {
+					const proxyOfTarget = proxies.get(t);
+					if (proxyOfTarget !== undefined) notify(proxyOfTarget);
+				}
+				return deleted;
+			}
+		});
+		proxies.set(target, proxy);
+		proxySet.add(proxy);
+		parents.set(proxy, parent);
+		return proxy;
+	},
+	subscribe = (target, subscriber) => {
+		let set = subscribers.get(target);
+		if (set === undefined) {
+			set = new Set();
+			subscribers.set(target, set);
+		}
+		set.add(subscriber);
+		return () => {
+			set?.delete(subscriber);
+		};
+	},
+	isObject = (value) => typeof value === "object" && value !== null,
+	isArrayLength = (target, key) => Array.isArray(target) && key === "length";
+var init_reactive = __esm(() => {
+	subscribers = new WeakMap();
+	parents = new WeakMap();
+	proxies = new WeakMap();
+	proxySet = new WeakSet();
+});
+
+// src/component.ts
+var exports_component = {};
+__export(exports_component, {
+	TemplesComponent: () => TemplesComponent
+});
+var documentListeners,
+	messageHandlers,
+	dispatchMessage = (type, detail) => {
+		const subscriptions = messageHandlers.get(type);
+		if (subscriptions === undefined) return;
+		const event = new CustomEvent(type, { detail });
+		for (const { component, handler } of [...subscriptions]) handler.call(component, event);
+	},
+	TemplesComponent;
+var init_component = __esm(() => {
+	init_engine();
+	init_reactive();
+	documentListeners = new Map();
+	messageHandlers = new Map();
+	TemplesComponent = class TemplesComponent extends HTMLElement {
+		static tag = "";
+		static template = "";
+		static css = "";
+		static events = {};
+		static observedAttributes = [];
+		static attributeTypes = {};
+		static globalStore;
+		renderer = null;
+		unsubscribeState = null;
+		eventHandlers = {};
+		messageUnsubscribers = [];
+		constructor() {
+			super();
+			this.state = {};
+		}
+		static define(tagNameOrOptions, componentClass, options) {
+			const self = this;
+			const ctor = typeof tagNameOrOptions === "string" ? componentClass : self;
+			if (typeof tagNameOrOptions === "string") {
+				ctor.tag = tagNameOrOptions;
+				ctor.template = options?.template ?? "";
+				if (options?.events !== undefined) {
+					ctor.events = options.events;
+				}
+				ctor.css = options?.css ?? "";
+				if (options?.globalStore !== undefined) {
+					TemplesComponent.globalStore = options.globalStore;
+				}
+			} else if (tagNameOrOptions?.globalStore !== undefined) {
+				TemplesComponent.globalStore = tagNameOrOptions.globalStore;
+			}
+			TemplesComponent.resolveTemplate(ctor);
+			TemplesComponent.registerEventTypes(ctor);
+			customElements.define(ctor.tag, ctor);
+		}
+		static registerEventTypes(ctor) {
+			for (const binding of Object.keys(ctor.events)) {
+				const space = binding.indexOf(" ");
+				if (space === -1) continue;
+				TemplesComponent.ensureDocumentListener(binding.slice(0, space));
+			}
+		}
+		static ensureDocumentListener(type) {
+			if (documentListeners.has(type)) return;
+			const listener = (event) => TemplesComponent.dispatch(type, event);
+			document.addEventListener(type, listener);
+			documentListeners.set(type, listener);
+		}
+		static dispatch(type, event) {
+			const component = TemplesComponent.resolveComponent(event);
+			if (component === null) return;
+			for (const [binding, handler] of Object.entries(component.eventHandlers)) {
+				const separator = binding.indexOf(" ");
+				const bindingType = binding.slice(0, separator);
+				if (bindingType !== type) continue;
+				const selector = binding.slice(separator + 1).trim();
+				if (TemplesComponent.matchesSelector(event, selector, component)) {
+					handler.call(component, event);
+				}
+			}
+		}
+		static resolveComponent(event) {
+			for (const node of event.composedPath()) {
+				if (node instanceof TemplesComponent) return node;
+			}
+			return null;
+		}
+		static matchesSelector(event, selector, component) {
+			for (const node of event.composedPath()) {
+				if (node === component) return component.matches(selector);
+				if (node instanceof Element && node.matches(selector)) return true;
+			}
+			return false;
+		}
+		static resolveTemplate(ctor) {
+			let template = document.head.querySelector(`template#${ctor.tag}`);
+			if (template === null) {
+				template = document.createElement("template");
+				template.id = ctor.tag;
+				template.innerHTML = ctor.template;
+				document.head.appendChild(template);
+			}
+			return template;
+		}
+		connectedCallback() {
+			const ctor = this.constructor;
+			const template = TemplesComponent.resolveTemplate(ctor);
+			const content = template.content.cloneNode(true);
+			const container = document.createElement("div");
+			container.appendChild(content);
+			this.renderer = new Renderer(container);
+			for (const name of ctor.observedAttributes) {
+				if (this.hasAttribute(name)) {
+					this.state[name] = this.coerceAttribute(name, this.getAttribute(name));
+				} else if (
+					TemplesComponent.globalStore !== undefined &&
+					name in TemplesComponent.globalStore
+				) {
+					this.state[name] = TemplesComponent.globalStore[name];
+				}
+			}
+			this.state = reactive(this.state);
+			this.unsubscribeState = subscribe(this.state, () => this.rerender());
+			this.rerender();
+			this.on(ctor.events);
+		}
+		disconnectedCallback() {
+			if (this.unsubscribeState !== null) {
+				this.unsubscribeState();
+				this.unsubscribeState = null;
+			}
+			for (const unsubscribe of this.messageUnsubscribers) unsubscribe();
+			this.messageUnsubscribers = [];
+			this.eventHandlers = {};
+			this.renderer = null;
+			this.replaceChildren();
+		}
+		attributeChangedCallback(name, _oldValue, newValue) {
+			this.state[name] = this.coerceAttribute(name, newValue);
+			this.rerender();
+		}
+		emit(name, detail) {
+			const ctor = this.constructor;
+			dispatchMessage(`${ctor.tag}:${name}`, detail);
+		}
+		on(events) {
+			for (const [binding, methodName] of Object.entries(events)) {
+				const handler = this.resolveHandler(methodName);
+				const space = binding.indexOf(" ");
+				if (space === -1) {
+					this.subscribeMessage(binding, handler);
+				} else {
+					this.eventHandlers[binding] = handler;
+					TemplesComponent.ensureDocumentListener(binding.slice(0, space));
+				}
+			}
+		}
+		resolveHandler(methodName) {
+			const method = this[methodName];
+			if (typeof method !== "function") {
+				throw new Error(`Event handler "${methodName}" is not a method of <${this.tagName}>`);
+			}
+			return method;
+		}
+		subscribeMessage(name, handler) {
+			let set = messageHandlers.get(name);
+			if (set === undefined) {
+				set = new Set();
+				messageHandlers.set(name, set);
+			}
+			const subscription = { component: this, handler };
+			set.add(subscription);
+			this.messageUnsubscribers.push(() => {
+				set.delete(subscription);
+			});
+		}
+		rerender() {
+			if (this.renderer === null) return;
+			const container = this.renderer.rootElt;
+			while (this.firstChild !== null) container.appendChild(this.firstChild);
+			this.renderer.render(this.state);
+			while (container.firstChild !== null) this.appendChild(container.firstChild);
+		}
+		coerceAttribute(name, raw) {
+			const ctor = this.constructor;
+			const type = ctor.attributeTypes[name] ?? "string";
+			switch (type) {
+				case "boolean":
+					return raw === null ? false : raw !== "false" && raw !== "0";
+				case "number": {
+					if (raw === null) return 0;
+					const value = Number(raw);
+					return Number.isNaN(value) ? raw : value;
+				}
+				case "json": {
+					if (raw === null) return null;
+					try {
+						return JSON.parse(raw);
+					} catch {
+						return raw;
+					}
+				}
+				default:
+					return raw ?? "";
+			}
+		}
+	};
+});
+init_component();
+
+export { TemplesComponent };

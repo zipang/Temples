@@ -4,21 +4,21 @@ import type { TemplesData } from "./engine";
  * Options that reconfigure how `prepare` renders a template.
  */
 export interface PrepareOptions {
-    /**
-     * Include the TemplesComponent library in the output so custom elements
-     * rehydrate (mount and activate) in the browser.
-     */
-    rehydrate?: boolean;
-    /**
-     * Remove every Temples trace from the output: all `data-*` binding
-     * attributes and every used component, rendered to plain static markup.
-     */
-    removeDataBindings?: boolean;
-    /**
-     * The `TemplesComponent` classes used by the template. `prepare` registers
-     * each class so its custom tag renders through the component engine.
-     */
-    templesComponents?: (typeof TemplesComponent)[];
+	/**
+	 * Include the TemplesComponent library in the output so custom elements
+	 * rehydrate (mount and activate) in the browser.
+	 */
+	rehydrate?: boolean;
+	/**
+	 * Remove every Temples trace from the output: all `data-*` binding
+	 * attributes and every used component, rendered to plain static markup.
+	 */
+	removeDataBindings?: boolean;
+	/**
+	 * The `TemplesComponent` classes used by the template. `prepare` registers
+	 * each class so its custom tag renders through the component engine.
+	 */
+	templesComponents?: (typeof TemplesComponent)[];
 }
 /**
  * A prepared render function:

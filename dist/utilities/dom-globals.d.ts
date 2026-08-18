@@ -6,7 +6,22 @@
  * `globalThis` to evaluate against a real DOM. The list is shared by the SSR
  * entry and the test environment setup.
  */
-export declare const DOM_GLOBALS: readonly ["window", "document", "Document", "DocumentFragment", "Element", "HTMLElement", "Node", "DOMParser", "customElements", "CustomElementRegistry", "Event", "CustomEvent", "MutationObserver", "ShadowRoot"];
+export declare const DOM_GLOBALS: readonly [
+	"window",
+	"document",
+	"Document",
+	"DocumentFragment",
+	"Element",
+	"HTMLElement",
+	"Node",
+	"DOMParser",
+	"customElements",
+	"CustomElementRegistry",
+	"Event",
+	"CustomEvent",
+	"MutationObserver",
+	"ShadowRoot"
+];
 /**
  * Extract the values of the DOM globals from a linkedom window.
  *
@@ -17,7 +32,10 @@ export declare const DOM_GLOBALS: readonly ["window", "document", "Document", "D
  * @param keys - The global keys to extract; defaults to `DOM_GLOBALS`.
  * @returns A dictionary of global names to their window values.
  */
-export declare const extractDomGlobals: (source: Record<string, unknown>, keys?: readonly string[]) => Record<string, unknown>;
+export declare const extractDomGlobals: (
+	source: Record<string, unknown>,
+	keys?: readonly string[]
+) => Record<string, unknown>;
 /**
  * Install a dictionary of values onto `globalThis`.
  *

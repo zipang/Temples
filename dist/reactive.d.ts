@@ -7,7 +7,8 @@ export type ReactiveSubscriber = () => void;
  *
  * Reading a nested object or array returns its own reactive proxy, so changes
  * at any depth notify the subscribers of every ancestor. Mutations fire
- * subscribers registered with `subscribe`.
+ * subscribers registered with `subscribe`. The call is idempotent: an object
+ * that is already a reactive proxy is returned unchanged.
  *
  * @param target - The object to make reactive.
  * @param parent - The reactive parent, set for nested objects automatically.
@@ -25,4 +26,7 @@ export declare const reactive: <T extends object>(target: T, parent?: object) =>
  * @param subscriber - Callback invoked on every change.
  * @returns An unsubscribe function that stops the callback from firing.
  */
-export declare const subscribe: <T extends object>(target: T, subscriber: ReactiveSubscriber) => (() => void);
+export declare const subscribe: <T extends object>(
+	target: T,
+	subscriber: ReactiveSubscriber
+) => () => void;
