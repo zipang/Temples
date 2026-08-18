@@ -172,8 +172,9 @@ export class TemplesComponent extends HTMLElement {
 	/**
 	 * Reactive component state.
 	 *
-	 * Subclasses assign an initial `reactive({ ... })` value. Mutations to this
-	 * object re-render the component automatically.
+	 * Subclasses assign an initial plain object, e.g. `state = { count: 0 }`.
+	 * The object is wrapped in a reactive proxy automatically when the component
+	 * connects, so any mutation re-renders the component.
 	 */
 	declare state: Record<string, unknown>;
 
@@ -194,7 +195,7 @@ export class TemplesComponent extends HTMLElement {
 
 	constructor() {
 		super();
-		this.state = reactive({});
+		this.state = {};
 	}
 
 	/**
@@ -427,6 +428,7 @@ export class TemplesComponent extends HTMLElement {
 			}
 		}
 
+		this.state = reactive(this.state);
 		this.unsubscribeState = subscribe(this.state, () => this.rerender());
 		this.rerender();
 

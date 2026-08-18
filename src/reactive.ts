@@ -19,6 +19,15 @@ const parents = new WeakMap<object, object | undefined>();
 const proxies = new WeakMap<object, object>();
 
 /**
+ * Every proxy created by `reactive`, for idempotency.
+ *
+ * A proxy is not a key in `proxies` (which maps raw targets to proxies), so a
+ * separate set recognizes an object that is already reactive and returns it
+ * unchanged instead of wrapping it a second time.
+ */
+const proxySet = new WeakSet<object>();
+
+/**
  * Notify a reactive object and bubble up to its parents.
  *
  * A mutation on a nested object fires its own subscribers, then walks the
@@ -43,7 +52,8 @@ const notify = (target: object): void => {
  *
  * Reading a nested object or array returns its own reactive proxy, so changes
  * at any depth notify the subscribers of every ancestor. Mutations fire
- * subscribers registered with `subscribe`.
+ * subscribers registered with `subscribe`. The call is idempotent: an object
+ * that is already a reactive proxy is returned unchanged.
  *
  * @param target - The object to make reactive.
  * @param parent - The reactive parent, set for nested objects automatically.
@@ -53,6 +63,8 @@ export const reactive = <T extends object>(target: T, parent?: object): T => {
 	const cached = proxies.get(target);
 
 	if (cached !== undefined) return cached as T;
+
+	if (proxySet.has(target)) return target;
 
 	const proxy = new Proxy(target, {
 		get(t, key, receiver) {
@@ -81,6 +93,7 @@ export const reactive = <T extends object>(target: T, parent?: object): T => {
 	});
 
 	proxies.set(target, proxy);
+	proxySet.add(proxy);
 	parents.set(proxy, parent);
 
 	return proxy as T;
