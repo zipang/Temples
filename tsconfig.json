@@ -14,6 +14,15 @@
 		"verbatimModuleSyntax": true,
 		"noEmit": true,
 
+		// Local aliases for the package subpaths consumed by the example.
+		// Point at the declaration files so type checking resolves the real API.
+		"paths": {
+			"@temples/components": ["./dist/component.d.ts"],
+			"@temples/engine": ["./dist/engine.d.ts"],
+			"@temples/ssr": ["./dist/ssr.d.ts"],
+			"@temples/jquery": ["./dist/jquery.d.ts"]
+		},
+
 		// Best practices
 		"strict": true,
 		"skipLibCheck": true,
@@ -26,5 +35,5 @@
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false
 	},
-	"exclude": ["dist"]
+	"exclude": ["dist", "dist/**"]
 }

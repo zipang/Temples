@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		// Resolve the local @temples/* subpaths to the built JavaScript at
+		// runtime. This config is read by Bun when bundling the example; type
+		// checking uses the root tsconfig, which maps the same subpaths to the
+		// declaration files.
+		"paths": {
+			"@temples/components": ["../dist/component.js"],
+			"@temples/engine": ["../dist/engine.js"],
+			"@temples/ssr": ["../dist/ssr.js"],
+			"@temples/jquery": ["../dist/jquery.js"]
+		}
+	}
+}

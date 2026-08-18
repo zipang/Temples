@@ -1,4 +1,4 @@
-import { reactive, TemplesComponent } from "../../../dist/index.js";
+import { TemplesComponent } from "@temples/components";
 import type { ShoppingItemData } from "../../types.ts";
 import template from "./shopping-vault.html" with { type: "text" };
 import "./shopping-vault.css";
@@ -11,12 +11,12 @@ import "./shopping-vault.css";
  * to restore the item into the active list.
  */
 export class ShoppingVault extends TemplesComponent {
-	override state = reactive({
+	override state = {
 		vaultItems: [] as ShoppingItemData[],
 		isEmpty() {
 			return this.vaultItems.length === 0;
 		}
-	});
+	};
 
 	static override events = {
 		"shopping-item:removed": "onRemoved",

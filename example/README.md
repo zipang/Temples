@@ -10,12 +10,11 @@ You can an interactive test on this example by running `bun demo` from the proje
 
 @TODO: Create a real working example with several components working together.
 
-## Local Package
+## Local package imports
 
-To replace an existing npm package with a local version in package.json, use the overrides field to specify a local file path.  This method effectively substitutes the original package with your local implementation for the entire dependency tree. 
+The example imports the package by name, e.g. `import { TemplesComponent } from "@temples/components"`. Two config files make the name resolve to the local `dist/` build:
 
-{
-  "overrides": {
-    "Temples": "file:../dist/Temples.js"
-  }
-}
+- The root `tsconfig.json` maps each `@temples/*` subpath to its `.d.ts` declaration file, so `tsc --noEmit` type checks against the real API.
+- `tsconfig.json` in this directory maps the same subpaths to the built `.js` files, so Bun resolves them at runtime when running the demo.
+
+Run `bun run build` at the project root first so the `dist/` files exist, then launch the demo with `bun demo`.

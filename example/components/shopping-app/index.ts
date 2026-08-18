@@ -1,4 +1,4 @@
-import { reactive, TemplesComponent } from "../../../dist/index.js";
+import { TemplesComponent } from "@temples/components";
 import type { ShoppingItemData } from "../../types.ts";
 import template from "./shopping-app.html" with { type: "text" };
 import "./shopping-app.css";
@@ -14,13 +14,13 @@ import "./shopping-app.css";
 export class ShoppingApp extends TemplesComponent {
 	static override observedAttributes = ["title"];
 
-	override state = reactive({
+	override state = {
 		title: "",
 		items: [] as ShoppingItemData[],
 		isEmpty() {
 			return this.items.length === 0;
 		}
-	});
+	};
 
 	static override events = {
 		"submit .add-form": "addItem",

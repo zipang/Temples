@@ -1,4 +1,4 @@
-import { type AttributeType, reactive, TemplesComponent } from "../../../dist/index.js";
+import { type AttributeType, TemplesComponent } from "@temples/components";
 import type { ShoppingItemData } from "../../types.ts";
 import template from "./shopping-item.html" with { type: "text" };
 import "./shopping-item.css";
@@ -15,7 +15,7 @@ export class ShoppingItem extends TemplesComponent {
 	static override observedAttributes = ["id", "label", "checked"];
 	static override attributeTypes: Record<string, AttributeType> = { checked: "boolean" };
 
-	override state = reactive({
+	override state = {
 		id: "",
 		label: "",
 		checked: false,
@@ -26,7 +26,7 @@ export class ShoppingItem extends TemplesComponent {
 		notEditing() {
 			return !this.editing;
 		}
-	});
+	};
 
 	static override events = {
 		"change .toggle": "onToggle",
