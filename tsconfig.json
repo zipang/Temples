@@ -5,9 +5,8 @@
 		"target": "ESNext",
 		"module": "preserve",
 		"moduleDetection": "force",
-		"jsx": "react-jsx",
 		"allowJs": true,
-		"types": ["bun"],
+		"types": ["bun", "jquery"],
 
 		// Bundler mode
 		"moduleResolution": "bundler",
@@ -26,5 +25,6 @@
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false
-	}
+	},
+	"exclude": ["dist"]
 }

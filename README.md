@@ -290,24 +290,29 @@ This lets designers work on markup and CSS freely, with very little chance of br
 ### 3. Assembly in `index.ts`
 
 The `index.ts` file is where all the parts come together.
-It imports the template, styles, and event handlers, defines the component class, and registers the custom element with `TemplesComponent.define()` :
+It imports the template and styles, defines the component class, and registers the custom element with `TemplesComponent.define()` :
 
 ```typescript
 import { TemplesComponent } from "../Temples";
 import template from "./flipping-card.html";
 import "./flipping-card.css";
-import { events } from "./flipping-card.js";
 
 export class FlippingCard extends TemplesComponent {
   static observedAttributes = ["title", "flipped"];
+
+  // Declarative event bindings, mapping a binding to a handler method name.
+  static events = {
+    "click .flip-btn": "flip",
+    "click .back-btn": "unflip"
+  };
 
   // Semantic state-transition methods (public API)
   flip() { this.setAttribute("flipped", "true"); }
   unflip() { this.setAttribute("flipped", "false"); }
 }
 
-// Register the custom element with its template and events
-TemplesComponent.define("flipping-card", FlippingCard, { template, events });
+// Register the custom element with its template
+TemplesComponent.define("flipping-card", FlippingCard, { template });
 ```
 
 Bun natively supports importing `.html` files as strings and `.css` files (which are injected into the page).
@@ -368,23 +373,41 @@ State-transition methods are public methods defined by the component author that
 flip() { this.setAttribute("flipped", "true"); }
 ```
 
-### 7. Event handling with `registerEvents()`
+### 7. Event handling
 
-The `.js` (or `.ts`) file exports an **event map** — a declarative mapping of `"<eventType> <selector>": handler` entries.
-Each handler receives the component instance (`host`) as its argument, giving it privileged internal access to `update()` and `render()` :
+Events are handled by the component's `static events` map, which maps each binding to the name of a handler **method** on the class.
+The handler runs with `this` bound to the component instance, so it can read `this.state` and call other component methods directly.
 
-```javascript
-// flipping-card.js
-export const events = {
-  "click .flip-btn": (host) => host.flip(),
-  "click .back-btn": (host) => host.unflip()
-};
+There are two kinds of bindings, unified in the same map :
+
+- **DOM events** — a key with a space, `"<eventType> <selector>"` (e.g. `"click .flip-btn"`). The handler runs when an event of that type bubbles from an element matching the selector inside the component.
+- **Inter-component messages** — a key without a space, `"<tag>:<message>"` (e.g. `"shopping-item:updated"`). The handler runs when another component emits that message on the shared event bus.
+
+```typescript
+export class ShoppingApp extends TemplesComponent {
+  static events = {
+    "submit .add-form": "onAdd",          // DOM event
+    "shopping-item:updated": "onUpdated", // inter-component message
+    "shopping-item:removed": "onRemoved",
+    "shopping-vault:recalled": "onRecalled"
+  };
+
+  onAdd(evt: Event) { /* this is the component instance */ }
+  onUpdated(evt: CustomEvent) { /* evt.detail carries the payload */ }
+}
 ```
 
-The event map is passed to `TemplesComponent.define()` and registered automatically during `connectedCallback` via the `registerEvents()` helper.
-Event listeners are cleaned up in `disconnectedCallback` to prevent memory leaks.
+The class `events` map is registered automatically when the component connects and unsubscribed when it disconnects, so no manual lifecycle wiring is needed.
+The `events` map can also be passed to `TemplesComponent.define()` :
 
-Though event handlers have access to `host.update()` and `host.render()`, the preferred pattern is to go through attributes or semantic state-transition methods — keeping attributes as the single source of truth.
+```typescript
+TemplesComponent.define("shopping-app", ShoppingApp, {
+  template,
+  events: { "submit .add-form": "onAdd" }
+});
+```
+
+To send an inter-component message, call `emit(name, detail)` ; it is delivered under the fully qualified name `<tag>:<name>`.
 
 ### 8. Styling
 
@@ -426,7 +449,7 @@ Parses the template HTML string into a `<template>` element (once) and calls `cu
 | `tagName` | `string` | The custom element tag name (must contain a hyphen) |
 | `ComponentClass` | `typeof TemplesComponent` | The class extending `TemplesComponent` |
 | `options.template` | `string` | The HTML template string (imported from the `.html` file) |
-| `options.events` | `EventMap` | Optional event handler map (imported from the `.js` file) |
+| `options.events` | `EventMap` | Optional event bindings, `binding: handlerMethodName` |
 
 ```typescript
 TemplesComponent.define("flipping-card", FlippingCard, { template, events });
@@ -444,6 +467,19 @@ When any of these attributes change, the value is aggregated into `this.data` an
 static observedAttributes = ["title", "flipped"];
 ```
 
+#### `static events: EventMap`
+
+The declarative event bindings, mapping a binding to a handler method name.
+A binding with a space is a DOM event, `"<eventType> <selector>"` ; a binding without a space is an inter-component message, `"<tag>:<message>"`.
+Handlers run with `this` bound to the component instance.
+
+```typescript
+static events = {
+  "click .flip-btn": "flip",
+  "shopping-item:updated": "onUpdated"
+};
+```
+
 ### Instance properties
 
 #### `this.data` (private)
@@ -451,6 +487,27 @@ static observedAttributes = ["title", "flipped"];
 The internal state object.
 Built from observed attributes on connection, and optionally enriched by the component's internal logic via `update()`.
 Not directly accessible or modifiable from outside the component.
+
+### Event methods
+
+#### `on(events: EventMap)`
+
+Registers a map of event bindings on this instance, merging them into the instance's active bindings.
+DOM bindings are served by a shared document listener ; message bindings subscribe to the shared event bus.
+The class `events` map is registered automatically on connection, so this method is mainly for runtime additions.
+
+```typescript
+this.on({ "click .refresh": "onRefresh" });
+```
+
+#### `emit(name, detail?)`
+
+Emits an inter-component message on the shared event bus.
+The message is delivered under the fully qualified name `<tag>:<name>`, so an emitter writes a short local name and classes never collide.
+
+```typescript
+this.emit("updated", { id: 1, label: "Milk" });
+```
 
 ### Internal methods
 
@@ -484,26 +541,9 @@ unflip() { this.setAttribute("flipped", "false"); }
 
 | Hook | Behavior |
 |------|----------|
-| `connectedCallback` | Clones the template content into the component, registers event listeners, performs initial render from current attribute values |
-| `disconnectedCallback` | Removes event listeners and frees bound resources |
+| `connectedCallback` | Clones the template content into the component, registers the class `events` map, performs initial render from current attribute values |
+| `disconnectedCallback` | Unsubscribes the instance's event bindings and frees bound resources |
 | `attributeChangedCallback` | Aggregates the changed attribute into `this.data` and triggers a re-render |
-
-### Helper: `registerEvents(host, eventMap)`
-
-Registers event listeners on the component instance.
-Called internally by the base class during `connectedCallback`.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `host` | `TemplesComponent` | The component instance |
-| `eventMap` | `Record<string, (host) => void>` | Map of `"<eventType> <selector>": handler` entries |
-
-```typescript
-const events = {
-  "click .flip-btn": (host) => host.flip()
-};
-registerEvents(host, events);
-```
 
 ## JQUERY PLUGIN
 
@@ -524,94 +564,3 @@ const renderer = $(".list").temples(); // get the prepared Renderer
 jQuery is a peer dependency of this export.
 The main entry never touches `$`.
 
-## Complete example: flipping-card
-
-A simple flip card component demonstrating all the pieces working together.
-
-**`flipping-card.html`** — the template :
-
-```html
-<div class="card-inner">
-  <div class="card-front">
-    <h2 data-bind="title">Card Title</h2>
-    <button class="flip-btn">Flip</button>
-  </div>
-  <div class="card-back">
-    <button class="back-btn">Back</button>
-  </div>
-</div>
-```
-
-**`flipping-card.js`** — the event handlers :
-
-```javascript
-export const events = {
-  "click .flip-btn": (host) => host.flip(),
-  "click .back-btn": (host) => host.unflip()
-};
-```
-
-**`flipping-card.css`** — the styles (scoped by tag name) :
-
-```css
-flipping-card {
-  display: inline-block;
-  perspective: 1000px;
-  width: 200px;
-  height: 300px;
-}
-
-flipping-card .card-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-}
-
-flipping-card[flipped="true"] .card-inner {
-  transform: rotateY(180deg);
-}
-
-flipping-card .card-front,
-flipping-card .card-back {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-}
-
-flipping-card .card-back {
-  transform: rotateY(180deg);
-}
-```
-
-**`index.ts`** — assembly and registration :
-
-```typescript
-import { TemplesComponent } from "../Temples";
-import template from "./flipping-card.html";
-import "./flipping-card.css";
-import { events } from "./flipping-card.js";
-
-export class FlippingCard extends TemplesComponent {
-  static observedAttributes = ["title", "flipped"];
-
-  flip() { this.setAttribute("flipped", "true"); }
-  unflip() { this.setAttribute("flipped", "false"); }
-}
-
-TemplesComponent.define("flipping-card", FlippingCard, { template, events });
-```
-
-**Usage in a page :**
-
-```html
-<!DOCTYPE html>
-<html>
-<body>
-  <flipping-card title="Hello World" flipped="false"></flipping-card>
-  <script type="module" src="./example/components/flipping-card/index.ts"></script>
-</body>
-</html>
-```

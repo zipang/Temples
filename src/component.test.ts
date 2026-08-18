@@ -201,6 +201,92 @@ describe("TemplesComponent.define", () => {
 		expect(list.querySelectorAll("todo-item")[0]?.textContent).toBe("A1");
 		list.remove();
 	});
+
+	test("define(tagName, componentClass, options) registers and copies options to the class", () => {
+		const clicks: string[] = [];
+
+		class Counter extends TemplesComponent {
+			static override observedAttributes = ["label"];
+			override state = reactive({ label: "" });
+
+			onClick(): void {
+				clicks.push("clicked");
+			}
+		}
+
+		TemplesComponent.define("canonical-counter", Counter, {
+			template: "<button class='inc' data-bind='text=label'>x</button>",
+			events: {
+				"click .inc": "onClick"
+			},
+			css: "canonical-counter { color: black; }",
+			globalStore: { label: "Count" }
+		});
+
+		expect(Counter.tag).toBe("canonical-counter");
+		expect(Counter.css).toBe("canonical-counter { color: black; }");
+
+		const elt = document.createElement("canonical-counter") as Counter;
+		document.body.appendChild(elt);
+
+		expect(elt.querySelector("button")?.textContent).toBe("Count");
+
+		elt.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(clicks).toEqual(["clicked"]);
+		elt.remove();
+	});
+
+	test("define(tagName, componentClass, options) without events preserves the class events map", () => {
+		const hits: TemplesComponent[] = [];
+
+		class Counter extends TemplesComponent {
+			static override events = { "click .inc": "onInc" };
+			override state = reactive({ count: 0 });
+
+			onInc(): void {
+				hits.push(this);
+			}
+		}
+
+		TemplesComponent.define("canonical-preserve-events", Counter, {
+			template: "<button class='inc'>+1</button>"
+		});
+
+		const elt = document.createElement("canonical-preserve-events") as Counter;
+		document.body.appendChild(elt);
+
+		elt.querySelector("button")?.dispatchEvent(new Event("click", { bubbles: true }));
+
+		expect(hits).toEqual([elt]);
+		elt.remove();
+	});
+
+	test("define(tagName, componentClass, options) lets an explicit attribute override the store", () => {
+		class Greeter extends TemplesComponent {
+			static override observedAttributes = ["name"];
+			override state = reactive({ name: "" });
+		}
+
+		TemplesComponent.define("canonical-greeter", Greeter, {
+			template: "<p data-bind='text=name'>?</p>",
+			globalStore: { name: "From Store" }
+		});
+
+		const fromStore = document.createElement("canonical-greeter") as Greeter;
+		document.body.appendChild(fromStore);
+
+		expect(fromStore.querySelector("p")?.textContent).toBe("From Store");
+
+		const explicit = document.createElement("canonical-greeter") as Greeter;
+		explicit.setAttribute("name", "Explicit");
+		document.body.appendChild(explicit);
+
+		expect(explicit.querySelector("p")?.textContent).toBe("Explicit");
+
+		fromStore.remove();
+		explicit.remove();
+	});
 });
 
 describe("TemplesComponent events", () => {
@@ -222,15 +308,19 @@ describe("TemplesComponent events", () => {
 			class Alpha extends TemplesComponent {
 				static override tag = "event-alpha";
 				static override template = "<b class='x'>a</b>";
-				static override events = { "dblclick .x": () => undefined };
+				static override events = { "dblclick .x": "onX" };
 				override state = reactive({});
+
+				onX(): void {}
 			}
 
 			class Beta extends TemplesComponent {
 				static override tag = "event-beta";
 				static override template = "<i class='x'>b</i>";
-				static override events = { "dblclick .x": () => undefined };
+				static override events = { "dblclick .x": "onX" };
 				override state = reactive({});
+
+				onX(): void {}
 			}
 
 			Alpha.define();
@@ -242,18 +332,18 @@ describe("TemplesComponent events", () => {
 		}
 	});
 
-	test("passes the event and the component to the handler", () => {
-		const captured: Array<{ evt: Event; cmpnt: TemplesComponent }> = [];
+	test("runs the handler with this bound to the component and the event passed", () => {
+		const captured: Array<{ evt: Event; self: TemplesComponent }> = [];
 
 		class Counter extends TemplesComponent {
 			static override tag = "event-counter";
 			static override template = "<input class='field'><button class='inc'>+1</button>";
-			static override events = {
-				"click .inc": (evt: Event, cmpnt: TemplesComponent) => {
-					captured.push({ evt, cmpnt });
-				}
-			};
+			static override events = { "click .inc": "onInc" };
 			override state = reactive({ count: 0 });
+
+			onInc(evt: Event): void {
+				captured.push({ evt, self: this });
+			}
 		}
 
 		Counter.define();
@@ -264,7 +354,7 @@ describe("TemplesComponent events", () => {
 		elt.querySelector("button.inc")?.dispatchEvent(new Event("click", { bubbles: true }));
 
 		expect(captured).toHaveLength(1);
-		expect(captured[0]?.cmpnt).toBe(elt);
+		expect(captured[0]?.self).toBe(elt);
 		expect(captured[0]?.evt).toBeInstanceOf(Event);
 		elt.remove();
 	});
@@ -276,14 +366,14 @@ describe("TemplesComponent events", () => {
 		class Form extends TemplesComponent {
 			static override tag = "event-form";
 			static override template = "<form class='form'><input class='field' value='hi'></form>";
-			static override events = {
-				"submit .form": (evt: Event) => {
-					evt.preventDefault();
-					defaultPrevented = evt.defaultPrevented;
-					inputValue = (evt.target as HTMLFormElement).querySelector("input")?.value ?? "";
-				}
-			};
+			static override events = { "submit .form": "onSubmit" };
 			override state = reactive({});
+
+			onSubmit(evt: Event): void {
+				evt.preventDefault();
+				defaultPrevented = evt.defaultPrevented;
+				inputValue = (evt.target as HTMLFormElement).querySelector("input")?.value ?? "";
+			}
 		}
 
 		Form.define();
@@ -306,10 +396,12 @@ describe("TemplesComponent events", () => {
 		class Counter extends TemplesComponent {
 			static override tag = "event-multi";
 			static override template = "<button class='inc'>+1</button>";
-			static override events = {
-				"click .inc": (_evt: Event, cmpnt: TemplesComponent) => clicked.push(cmpnt)
-			};
+			static override events = { "click .inc": "onInc" };
 			override state = reactive({ count: 0 });
+
+			onInc(): void {
+				clicked.push(this);
+			}
 		}
 
 		Counter.define();
@@ -341,19 +433,23 @@ describe("TemplesComponent events", () => {
 		class Inner extends TemplesComponent {
 			static override tag = "event-inner";
 			static override template = "<button class='act'>go</button>";
-			static override events = {
-				"click .act": (_evt: Event, cmpnt: TemplesComponent) => innerHits.push(cmpnt)
-			};
+			static override events = { "click .act": "onAct" };
 			override state = reactive({});
+
+			onAct(): void {
+				innerHits.push(this);
+			}
 		}
 
 		class Outer extends TemplesComponent {
 			static override tag = "event-outer";
 			static override template = "<event-inner></event-inner>";
-			static override events = {
-				"click .act": (_evt: Event, cmpnt: TemplesComponent) => outerHits.push(cmpnt)
-			};
+			static override events = { "click .act": "onAct" };
 			override state = reactive({});
+
+			onAct(): void {
+				outerHits.push(this);
+			}
 		}
 
 		Inner.define();
@@ -378,12 +474,12 @@ describe("TemplesComponent events", () => {
 		class Counter extends TemplesComponent {
 			static override tag = "event-mismatch";
 			static override template = "<button class='other'>x</button>";
-			static override events = {
-				"click .inc": () => {
-					hits++;
-				}
-			};
+			static override events = { "click .inc": "onInc" };
 			override state = reactive({});
+
+			onInc(): void {
+				hits++;
+			}
 		}
 
 		Counter.define();
@@ -403,12 +499,12 @@ describe("TemplesComponent events", () => {
 		class Counter extends TemplesComponent {
 			static override tag = "event-outside";
 			static override template = "<button class='inc'>+1</button>";
-			static override events = {
-				"click .inc": () => {
-					hits++;
-				}
-			};
+			static override events = { "click .inc": "onInc" };
 			override state = reactive({});
+
+			onInc(): void {
+				hits++;
+			}
 		}
 
 		Counter.define();
@@ -426,7 +522,7 @@ describe("TemplesComponent events", () => {
 
 describe("TemplesComponent messaging", () => {
 	test("emits a tag-prefixed message that a different class can subscribe to", () => {
-		const received: CustomEvent[] = [];
+		const received: Array<{ evt: CustomEvent; self: TemplesComponent }> = [];
 
 		class TaskItem extends TemplesComponent {
 			static override tag = "msg-item-a";
@@ -438,6 +534,10 @@ describe("TemplesComponent messaging", () => {
 			static override tag = "msg-list-a";
 			static override template = "<ul></ul>";
 			override state = reactive({});
+
+			onCompleted(evt: CustomEvent): void {
+				received.push({ evt, self: this });
+			}
 		}
 
 		TaskItem.define();
@@ -446,12 +546,13 @@ describe("TemplesComponent messaging", () => {
 		const item = document.createElement("msg-item-a") as TaskItem;
 		const list = document.createElement("msg-list-a") as TaskList;
 
-		list.on("msg-item-a:completed", (evt) => received.push(evt));
+		list.on({ "msg-item-a:completed": "onCompleted" });
 		item.emit("completed", { id: 1 });
 
 		expect(received).toHaveLength(1);
-		expect(received[0]?.type).toBe("msg-item-a:completed");
-		expect(received[0]?.detail).toEqual({ id: 1 });
+		expect(received[0]?.evt.type).toBe("msg-item-a:completed");
+		expect(received[0]?.evt.detail).toEqual({ id: 1 });
+		expect(received[0]?.self).toBe(list);
 	});
 
 	test("separates same local name emitted by different classes", () => {
@@ -462,12 +563,20 @@ describe("TemplesComponent messaging", () => {
 			static override tag = "msg-item-b";
 			static override template = "<li></li>";
 			override state = reactive({});
+
+			onChanged(evt: CustomEvent): void {
+				items.push(evt.detail);
+			}
 		}
 
 		class TaskNote extends TemplesComponent {
 			static override tag = "msg-note-b";
 			static override template = "<p></p>";
 			override state = reactive({});
+
+			onChanged(evt: CustomEvent): void {
+				notes.push(evt.detail);
+			}
 		}
 
 		TaskItem.define();
@@ -476,8 +585,8 @@ describe("TemplesComponent messaging", () => {
 		const item = document.createElement("msg-item-b") as TaskItem;
 		const note = document.createElement("msg-note-b") as TaskNote;
 
-		item.on("msg-item-b:changed", (evt) => items.push(evt.detail));
-		note.on("msg-note-b:changed", (evt) => notes.push(evt.detail));
+		item.on({ "msg-item-b:changed": "onChanged" });
+		note.on({ "msg-note-b:changed": "onChanged" });
 
 		item.emit("changed", "item-a");
 		note.emit("changed", "note-b");
@@ -493,21 +602,23 @@ describe("TemplesComponent messaging", () => {
 			static override tag = "msg-item-c";
 			static override template = "<li></li>";
 			override state = reactive({});
+
+			onPing(): void {
+				hits++;
+			}
 		}
 
 		TaskItem.define();
 
 		const item = document.createElement("msg-item-c") as TaskItem;
 
-		item.on("completed", () => {
-			hits++;
-		});
+		item.on({ completed: "onPing" });
 		item.emit("completed");
 
 		expect(hits).toBe(0);
 	});
 
-	test("on returns an unsubscribe function that stops delivery", () => {
+	test("disconnecting stops message delivery", () => {
 		let hits = 0;
 
 		class Emitter extends TemplesComponent {
@@ -516,18 +627,28 @@ describe("TemplesComponent messaging", () => {
 			override state = reactive({});
 		}
 
+		class Listener extends TemplesComponent {
+			static override tag = "msg-listener";
+			static override template = "<span></span>";
+			static override events = { "msg-emitter:ping": "onPing" };
+			override state = reactive({});
+
+			onPing(): void {
+				hits++;
+			}
+		}
+
 		Emitter.define();
+		Listener.define();
 
 		const emitter = document.createElement("msg-emitter") as Emitter;
+		const listener = document.createElement("msg-listener") as Listener;
 
-		const off = emitter.on("msg-emitter:ping", () => {
-			hits++;
-		});
-
+		document.body.appendChild(listener);
 		emitter.emit("ping");
 		expect(hits).toBe(1);
 
-		off();
+		listener.remove();
 		emitter.emit("ping");
 		expect(hits).toBe(1);
 	});
@@ -545,6 +666,10 @@ describe("TemplesComponent messaging", () => {
 			static override tag = "msg-list-d";
 			static override template = "<ul></ul>";
 			override state = reactive({});
+
+			onCompleted(): void {
+				hits++;
+			}
 		}
 
 		TaskItem.define();
@@ -553,9 +678,7 @@ describe("TemplesComponent messaging", () => {
 		const item = document.createElement("msg-item-d") as TaskItem;
 		const list = document.createElement("msg-list-d") as TaskList;
 
-		list.on("msg-item-d:completed", () => {
-			hits++;
-		});
+		list.on({ "msg-item-d:completed": "onCompleted" });
 		item.emit("completed");
 
 		expect(hits).toBe(1);

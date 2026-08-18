@@ -11,35 +11,73 @@ import { reactive, subscribe } from "./reactive";
 export type AttributeType = "boolean" | "number" | "json" | "string";
 
 /**
- * Event handler invoked by a declarative event binding.
+ * Handler invoked by an event binding.
  *
- * The handler receives the original `Event` and the component instance whose
- * event map declared the binding.
+ * A handler is a component method that receives the event — either a DOM event
+ * (`"eventType selector"` binding) or a `CustomEvent` carrying a message
+ * (`"tag:name"` binding). It runs with `this` bound to the component instance,
+ * so handlers can read `this.state` and call other component methods directly.
  */
-export type EventHandler = (event: Event, component: TemplesComponent) => void;
+export type EventHandler = (this: TemplesComponent, event: Event) => void;
 
 /**
  * Declarative map of event bindings.
  *
- * Each key has the form `"eventType selector"`, e.g. `"click .add-btn"`, and
- * maps to the handler run when an event of that type bubbles from an element
- * matching the selector inside the component.
+ * Each key maps to the name of a handler method on the component class. A key
+ * with a space is a DOM binding, `"eventType selector"` (e.g.
+ * `"click .add-btn"`), run when an event of that type bubbles from an element
+ * matching the selector. A key without a space is an inter-component message
+ * name, `"tag:name"` (e.g. `"shopping-item:updated"`), delivered by the shared
+ * event bus. Both are handled by the same method-name lookup.
  */
-export type EventMap = Record<string, EventHandler>;
+export type EventMap = Record<string, string>;
 
 /**
- * Handler for a message delivered by the shared event bus.
+ * Options passed to `TemplesComponent.define(tagName, componentClass, options)`.
  *
- * The handler receives the `CustomEvent` whose `type` is the fully qualified
- * message name and whose `detail` holds the emitted payload.
+ * The template is required: a component cannot exist without markup. The other
+ * options are optional and are copied onto the component class's static fields
+ * so server-side rendering can read them.
  */
-export type MessageHandler = (event: CustomEvent) => void;
+export interface DefineOptions {
+	/**
+	 * The HTML template string, parsed once by `define()`.
+	 */
+	template: string;
+
+	/**
+	 * Optional declarative event map, mapping a binding to a handler method name.
+	 */
+	events?: EventMap;
+
+	/**
+	 * The component stylesheet, concatenated into the SSR output by `prepare()`.
+	 */
+	css?: string;
+
+	/**
+	 * The global data store shared by every component. It seeds observed
+	 * attributes that are absent on the tag.
+	 */
+	globalStore?: TemplesData;
+}
+
+/**
+ * A message subscription, tying a handler method to the component that owns it.
+ *
+ * The bus stores the component and the resolved handler so delivery can invoke
+ * the handler with `this` bound to the owning component.
+ */
+interface MessageSubscription {
+	component: TemplesComponent;
+	handler: EventHandler;
+}
 
 /**
  * Document-level listeners, one per event type, shared by every component.
  *
  * The listener resolves the closest `TemplesComponent` ancestor of the event
- * target and dispatches to that component's own `events` map, so a single
+ * target and dispatches to that component's own `eventHandlers` map, so a single
  * listener serves all instances of all classes that use the same event type.
  */
 const documentListeners = new Map<string, (event: Event) => void>();
@@ -52,25 +90,26 @@ const documentListeners = new Map<string, (event: Event) => void>();
  * prefixed with the emitting tag (`task-item:completed`) to keep classes from
  * colliding on the same local name.
  */
-const messageHandlers = new Map<string, Set<MessageHandler>>();
+const messageHandlers = new Map<string, Set<MessageSubscription>>();
 
 /**
  * Deliver a message to every subscribed handler.
  *
  * A snapshot of the handler set is iterated so a handler that unsubscribes
- * during dispatch does not affect the current delivery.
+ * during dispatch does not affect the current delivery. Each handler runs with
+ * `this` bound to its owning component.
  *
  * @param type - The fully qualified message name.
  * @param detail - The payload delivered on the message's `detail` property.
  */
 const dispatchMessage = (type: string, detail: unknown): void => {
-	const handlers = messageHandlers.get(type);
+	const subscriptions = messageHandlers.get(type);
 
-	if (handlers === undefined) return;
+	if (subscriptions === undefined) return;
 
 	const event = new CustomEvent(type, { detail });
 
-	for (const handler of [...handlers]) handler(event);
+	for (const { component, handler } of [...subscriptions]) handler.call(component, event);
 };
 
 /**
@@ -102,7 +141,11 @@ export class TemplesComponent extends HTMLElement {
 	static css = "";
 
 	/**
-	 * Optional declarative event map, `"eventType selector": handler`.
+	 * Optional declarative event map, mapping a binding to a handler method name.
+	 *
+	 * A binding is either `"eventType selector"` (DOM event) or `"tag:name"`
+	 * (inter-component message). Handlers are methods on the component class,
+	 * run with `this` bound to the component instance.
 	 */
 	static events: EventMap = {};
 
@@ -137,27 +180,81 @@ export class TemplesComponent extends HTMLElement {
 	private renderer: Renderer | null = null;
 	private unsubscribeState: (() => void) | null = null;
 
+	/**
+	 * The instance's active event bindings, mapping a binding to its resolved
+	 * handler method. Seeded from the class `events` map on connection and
+	 * extended by dynamic `on()` calls.
+	 */
+	private eventHandlers: Record<string, EventHandler> = {};
+
+	/**
+	 * Unsubscribe functions for the message subscriptions made by this instance.
+	 */
+	private messageUnsubscribers: (() => void)[] = [];
+
 	constructor() {
 		super();
 		this.state = reactive({});
 	}
 
 	/**
-	 * Register the custom element.
+	 * Register the custom element from the subclass's static fields.
 	 *
-	 * Ensures a `<template id="tag">` exists in the document head, registers a
-	 * document-level listener for every event type in `events`, then calls
-	 * `customElements.define(this.tag, this)`.
+	 * The subclass declares `tag`, `template`, `events`, `css`,
+	 * `observedAttributes`, and `attributeTypes` as static fields. This form
+	 * keeps those fields as the single source of truth and stays available for
+	 * backward compatibility.
 	 *
 	 * @param options - Optional `globalStore` data dictionary shared by every
 	 * component. It seeds observed attributes that are absent on the tag.
 	 */
-	static define(options?: { globalStore?: TemplesData }): void {
-		// biome-ignore lint/complexity/noThisInStatic: `this` is the subclass constructor.
-		const ctor = this as typeof TemplesComponent;
+	static define(options?: { globalStore?: TemplesData }): void;
 
-		if (options?.globalStore !== undefined) {
-			TemplesComponent.globalStore = options.globalStore;
+	/**
+	 * Register the custom element with an explicit tag, class, and options.
+	 *
+	 * This is the canonical way to declare a component: the class carries its
+	 * `observedAttributes`, `attributeTypes`, `state`, and `events`, while the
+	 * tag name, template, and stylesheet are passed here. The options are copied
+	 * onto the class's static fields so server-side rendering can read them.
+	 *
+	 * @param tagName - The custom element tag name (must contain a hyphen).
+	 * @param componentClass - The class extending `TemplesComponent`.
+	 * @param options - The template (required) and optional events, css, and
+	 * global store.
+	 */
+	static define(
+		tagName: string,
+		componentClass: typeof TemplesComponent,
+		options: DefineOptions
+	): void;
+
+	static define(
+		tagNameOrOptions?: string | { globalStore?: TemplesData },
+		componentClass?: typeof TemplesComponent,
+		options?: DefineOptions
+	): void {
+		// biome-ignore lint/complexity/noThisInStatic: `this` is the subclass constructor in the backward-compatible form.
+		const self = this as typeof TemplesComponent;
+
+		const ctor =
+			typeof tagNameOrOptions === "string" ? (componentClass as typeof TemplesComponent) : self;
+
+		if (typeof tagNameOrOptions === "string") {
+			ctor.tag = tagNameOrOptions;
+			ctor.template = options?.template ?? "";
+
+			if (options?.events !== undefined) {
+				ctor.events = options.events;
+			}
+
+			ctor.css = options?.css ?? "";
+
+			if (options?.globalStore !== undefined) {
+				TemplesComponent.globalStore = options.globalStore;
+			}
+		} else if (tagNameOrOptions?.globalStore !== undefined) {
+			TemplesComponent.globalStore = tagNameOrOptions.globalStore;
 		}
 
 		TemplesComponent.resolveTemplate(ctor);
@@ -166,33 +263,49 @@ export class TemplesComponent extends HTMLElement {
 	}
 
 	/**
-	 * Register one document listener per event type declared in the class map.
+	 * Register one document listener per DOM event type declared in the class map.
 	 *
 	 * Listeners are deduplicated by event type across all component classes, so
 	 * a click handler is attached to the document exactly once no matter how
-	 * many classes or instances use it.
+	 * many classes or instances use it. Message bindings (no selector) need no
+	 * document listener.
 	 *
 	 * @param ctor - The component class whose `events` map to register.
 	 */
 	private static registerEventTypes(ctor: typeof TemplesComponent): void {
 		for (const binding of Object.keys(ctor.events)) {
-			const type = binding.slice(0, binding.indexOf(" "));
+			const space = binding.indexOf(" ");
 
-			if (!documentListeners.has(type)) {
-				const listener = (event: Event): void => TemplesComponent.dispatch(type, event);
+			if (space === -1) continue;
 
-				document.addEventListener(type, listener);
-				documentListeners.set(type, listener);
-			}
+			TemplesComponent.ensureDocumentListener(binding.slice(0, space));
 		}
+	}
+
+	/**
+	 * Attach a document listener for an event type, deduplicated by type.
+	 *
+	 * The listener resolves the closest component of the event target and
+	 * dispatches to its instance `eventHandlers` map.
+	 *
+	 * @param type - The event type to listen for.
+	 */
+	private static ensureDocumentListener(type: string): void {
+		if (documentListeners.has(type)) return;
+
+		const listener = (event: Event): void => TemplesComponent.dispatch(type, event);
+
+		document.addEventListener(type, listener);
+		documentListeners.set(type, listener);
 	}
 
 	/**
 	 * Handle a document-level event for one event type.
 	 *
 	 * The closest `TemplesComponent` ancestor of the event target owns the
-	 * event: only its `events` map is consulted, and a missing selector match
-	 * there leaves outer components untouched.
+	 * event: only its instance `eventHandlers` map is consulted, and a missing
+	 * selector match there leaves outer components untouched. The matched
+	 * handler runs with `this` bound to the owning component.
 	 *
 	 * @param type - The event type this listener was registered for.
 	 * @param event - The event that bubbled to the document.
@@ -202,9 +315,7 @@ export class TemplesComponent extends HTMLElement {
 
 		if (component === null) return;
 
-		const ctor = component.constructor as typeof TemplesComponent;
-
-		for (const [binding, handler] of Object.entries(ctor.events)) {
+		for (const [binding, handler] of Object.entries(component.eventHandlers)) {
 			const separator = binding.indexOf(" ");
 			const bindingType = binding.slice(0, separator);
 
@@ -213,7 +324,7 @@ export class TemplesComponent extends HTMLElement {
 			const selector = binding.slice(separator + 1).trim();
 
 			if (TemplesComponent.matchesSelector(event, selector, component)) {
-				handler(event, component);
+				handler.call(component, event);
 			}
 		}
 	}
@@ -318,13 +429,17 @@ export class TemplesComponent extends HTMLElement {
 
 		this.unsubscribeState = subscribe(this.state, () => this.rerender());
 		this.rerender();
+
+		this.on(ctor.events);
 	}
 
 	/**
-	 * Release the state subscription and the children.
+	 * Release the state subscription, the event bindings, and the children.
 	 *
-	 * Document-level event listeners persist for the lifetime of the document
-	 * and are not tied to any single instance.
+	 * Message subscriptions are unsubscribed so a removed component stops
+	 * receiving inter-component messages. Document-level event listeners
+	 * persist for the lifetime of the document and are not tied to any single
+	 * instance.
 	 *
 	 * Called by the browser when the element disconnects from the DOM.
 	 */
@@ -333,6 +448,10 @@ export class TemplesComponent extends HTMLElement {
 			this.unsubscribeState();
 			this.unsubscribeState = null;
 		}
+
+		for (const unsubscribe of this.messageUnsubscribers) unsubscribe();
+		this.messageUnsubscribers = [];
+		this.eventHandlers = {};
 
 		this.renderer = null;
 		this.replaceChildren();
@@ -358,7 +477,7 @@ export class TemplesComponent extends HTMLElement {
 	 *
 	 * The message is delivered under the fully qualified name `<tag>:<name>`, so
 	 * an emitter writes a short local name and classes never collide. Subscribers
-	 * elsewhere use `on("<tag>:<name>", handler)`.
+	 * elsewhere register `"<tag>:<name>"` in their `events` map.
 	 *
 	 * @param name - The local message name, prefixed with the emitting tag.
 	 * @param detail - Optional payload delivered on the message's `detail`.
@@ -370,17 +489,63 @@ export class TemplesComponent extends HTMLElement {
 	}
 
 	/**
-	 * Subscribe to a message on the shared event bus.
+	 * Register a map of event bindings on this instance.
 	 *
-	 * The name is fully qualified, e.g. `on("task-item:completed", handler)`.
-	 * Messaging is loose: the handler is stored on the shared bus, not tied to
-	 * the DOM, so any component may subscribe to any other class's messages.
+	 * Each binding maps to a handler method name. A binding with a space is a
+	 * DOM event, `"eventType selector"`, delivered by a shared document
+	 * listener; a binding without a space is an inter-component message,
+	 * `"tag:name"`, delivered by the shared event bus. In both cases the handler
+	 * runs with `this` bound to this component.
+	 *
+	 * The class `events` map is registered automatically on connection; this
+	 * method also lets a component add bindings at runtime.
+	 *
+	 * @param events - The event bindings to register, `binding: methodName`.
+	 */
+	on(events: EventMap): void {
+		for (const [binding, methodName] of Object.entries(events)) {
+			const handler = this.resolveHandler(methodName);
+			const space = binding.indexOf(" ");
+
+			if (space === -1) {
+				this.subscribeMessage(binding, handler);
+			} else {
+				this.eventHandlers[binding] = handler;
+				TemplesComponent.ensureDocumentListener(binding.slice(0, space));
+			}
+		}
+	}
+
+	/**
+	 * Resolve a handler method name to the method on this component.
+	 *
+	 * The method is looked up by name so handlers are declared as ordinary class
+	 * methods and run with `this` bound to the component instance.
+	 *
+	 * @param methodName - The handler method name from an event binding.
+	 * @returns The handler method.
+	 */
+	private resolveHandler(methodName: string): EventHandler {
+		const method = (this as unknown as Record<string, EventHandler>)[methodName];
+
+		if (typeof method !== "function") {
+			throw new Error(`Event handler "${methodName}" is not a method of <${this.tagName}>`);
+		}
+
+		return method;
+	}
+
+	/**
+	 * Subscribe this component to a message on the shared event bus.
+	 *
+	 * The subscription is stored with the owning component so delivery runs the
+	 * handler with `this` bound to it. The unsubscribe function is retained so
+	 * `disconnectedCallback` can release every subscription of the instance.
 	 *
 	 * @param name - The fully qualified message name to listen for.
-	 * @param handler - The handler invoked with the delivered `CustomEvent`.
-	 * @returns An unsubscribe function that stops delivery.
+	 * @param handler - The handler method invoked with the delivered `CustomEvent`.
 	 */
-	on(name: string, handler: MessageHandler): () => void {
+	private subscribeMessage(name: string, handler: EventHandler): void {
 		let set = messageHandlers.get(name);
 
 		if (set === undefined) {
@@ -388,11 +553,13 @@ export class TemplesComponent extends HTMLElement {
 			messageHandlers.set(name, set);
 		}
 
-		const handlers = set;
+		const subscription: MessageSubscription = { component: this, handler };
 
-		handlers.add(handler);
+		set.add(subscription);
 
-		return () => handlers.delete(handler);
+		this.messageUnsubscribers.push(() => {
+			set.delete(subscription);
+		});
 	}
 
 	/**
