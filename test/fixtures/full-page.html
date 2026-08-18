@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title data-bind="text=page.title">My Temples Blog</title>
+</head>
+<body>
+	<header class="site-header">
+		<h1 data-bind="text=page.title">My Temples Blog</h1>
+		<p class="tagline" data-bind="text=page.tagline">Templates you won't hate</p>
+	</header>
+
+	<main>
+		<section class="featured" data-render-if="article.featured">
+			<h2 data-bind="text=article.title">Featured Article</h2>
+			<div data-bind="html=article.summary">Summary here</div>
+		</section>
+
+		<section class="quotes" data-render-if="article.quotes.length">
+			<h3>Quotes</h3>
+			<div class="quotes-list" data-iterate="quote: article.quotes" data-key="quote.id">
+				<blockquote class="quote">
+					<p data-bind="text=quote.text">A quote</p>
+					<cite data-bind="text=quote.author">Author</cite>
+				</blockquote>
+			</div>
+		</section>
+
+		<nav class="tags" data-iterate="tag: article.tags">
+			<!-- biome-ignore lint/a11y/useValidAnchor: the href is bound at render time by data-bind -->
+			<a data-bind="href=tag.url, text=tag.label">tag</a>
+		</nav>
+
+		<div class="row" data-bind="class[featured|popular|quote]=article.type">Type badge</div>
+
+		<input class="author-input" type="text" data-bind="value=user.name" value="Anonymous">
+		<img class="avatar" data-bind="src=user.avatar, alt=user.name" src="placeholder.png" alt="avatar">
+
+		<article-card></article-card>
+		<article-card title="Local Title" type="popular"></article-card>
+		<user-card></user-card>
+		<user-card name="Bob" avatar="/img/bob.png"></user-card>
+	</main>
+
+	<footer class="site-footer">
+		<p data-bind="text=page.footer">Footer text</p>
+	</footer>
+</body>
+</html>
