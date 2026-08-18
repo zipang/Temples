@@ -1,0 +1,51 @@
+shopping-vault {
+	display: block;
+	margin-top: 2rem;
+}
+
+shopping-vault .vault {
+	border: 1px dashed #999;
+	padding: 1rem;
+}
+
+shopping-vault h2 {
+	font-size: 1.25rem;
+	margin: 0 0 0.75rem;
+}
+
+shopping-vault .vault-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+shopping-vault .vault-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.4rem 0;
+	border-bottom: 1px solid #eee;
+}
+
+shopping-vault .vault-label {
+	color: #777;
+	text-decoration: line-through;
+}
+
+shopping-vault .recall {
+	font: inherit;
+	background: #fff;
+	border: 1px solid #000;
+	padding: 0.2rem 0.5rem;
+	cursor: pointer;
+}
+
+shopping-vault .recall:hover {
+	background: #000;
+	color: #fff;
+}
+
+shopping-vault .empty {
+	color: #888;
+	font-style: italic;
+}

@@ -1,0 +1,44 @@
+shopping-item {
+	display: block;
+}
+
+shopping-item .item {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid #ddd;
+}
+
+shopping-item .toggle {
+	accent-color: #000;
+}
+
+shopping-item .label {
+	flex: 1;
+}
+
+shopping-item .edit-input {
+	flex: 1;
+	font: inherit;
+	padding: 0.2rem 0.4rem;
+	border: 1px solid #000;
+}
+
+shopping-item .item.checked .label {
+	text-decoration: line-through;
+	color: #999;
+}
+
+shopping-item button {
+	font: inherit;
+	background: #fff;
+	border: 1px solid #000;
+	padding: 0.25rem 0.5rem;
+	cursor: pointer;
+}
+
+shopping-item button:hover {
+	background: #000;
+	color: #fff;
+}

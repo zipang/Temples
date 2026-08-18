@@ -1,0 +1,12 @@
+body {
+	font-family: Georgia, "Times New Roman", serif;
+	background: #fff;
+	color: #111;
+	margin: 0;
+}
+
+main {
+	max-width: 40rem;
+	margin: 0 auto;
+	padding: 2rem 1rem;
+}

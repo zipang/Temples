@@ -9,3 +9,13 @@ You can an interactive test on this example by running `bun demo` from the proje
 ```
 
 @TODO: Create a real working example with several components working together.
+
+## Local Package
+
+To replace an existing npm package with a local version in package.json, use the overrides field to specify a local file path.  This method effectively substitutes the original package with your local implementation for the entire dependency tree. 
+
+{
+  "overrides": {
+    "Temples": "file:../dist/Temples.js"
+  }
+}

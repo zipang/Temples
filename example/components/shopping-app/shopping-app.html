@@ -1,0 +1,12 @@
+<section class="app">
+	<h1 class="title" data-bind="text=title">Shopping List</h1>
+	<form class="add-form">
+		<input class="add-input" type="text" placeholder="Add an item…" autocomplete="off">
+		<button class="add-btn" type="submit">Add</button>
+	</form>
+	<ul class="items" data-iterate="item: items" data-key="id">
+		<shopping-item data-bind="id=item.id, label=item.label, checked=item.checked"></shopping-item>
+	</ul>
+	<p class="empty" data-render-if="isEmpty">Your list is empty. Add an item above.</p>
+	<shopping-vault></shopping-vault>
+</section>

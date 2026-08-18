@@ -1,0 +1,47 @@
+shopping-app {
+	display: block;
+}
+
+shopping-app .title {
+	font-size: 2rem;
+	margin: 0 0 1rem;
+}
+
+shopping-app .add-form {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
+}
+
+shopping-app .add-input {
+	flex: 1;
+	font: inherit;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid #000;
+}
+
+shopping-app .add-btn {
+	font: inherit;
+	padding: 0.5rem 1rem;
+	border: 1px solid #000;
+	background: #000;
+	color: #fff;
+	cursor: pointer;
+}
+
+shopping-app .add-btn:hover {
+	background: #fff;
+	color: #000;
+}
+
+shopping-app .items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	border: 1px solid #000;
+}
+
+shopping-app .empty {
+	color: #888;
+	font-style: italic;
+}

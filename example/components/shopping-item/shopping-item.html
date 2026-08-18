@@ -1,0 +1,8 @@
+<li class="item" data-bind="class[checked|unchecked]=checkedClass">
+	<input class="toggle" type="checkbox" data-bind="checked=checked">
+	<span class="label" data-bind="text=label, hidden=editing"></span>
+	<input class="edit-input" type="text" data-bind="value=label, hidden=notEditing">
+	<button class="edit" type="button" data-bind="hidden=editing">Edit</button>
+	<button class="save" type="button" data-bind="hidden=notEditing">Save</button>
+	<button class="remove" type="button">Remove</button>
+</li>

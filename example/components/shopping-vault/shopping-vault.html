@@ -1,0 +1,10 @@
+<section class="vault">
+	<h2>Vault</h2>
+	<ul class="vault-list" data-iterate="item: vaultItems" data-key="id">
+		<li class="vault-item">
+			<span class="vault-label" data-bind="text=item.label"></span>
+			<button class="recall" type="button" data-bind="data-id=item.id">Recall</button>
+		</li>
+	</ul>
+	<p class="empty" data-render-if="isEmpty">The vault is empty.</p>
+</section>
