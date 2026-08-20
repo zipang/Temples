@@ -17,6 +17,12 @@
 			"assist": {
 				"enabled": false
 			}
+		},
+		{
+			"includes": ["dist/**/*.min.js"],
+			"formatter": {
+				"enabled": false
+			}
 		}
 	],
 	"formatter": {

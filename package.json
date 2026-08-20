@@ -31,17 +31,17 @@
 		"format:check": "biome format .",
 		"check": "biome check .",
 		"typecheck": "tsc --noEmit",
-		"build": "tsc --noEmit && bun build src/component.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\" && tsc -p tsconfig.build.json && biome format --write dist",
+		"build": "tsc --noEmit && bun build src/component.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --entry-naming \"[name].[ext]\" && bun build src/component.ts src/engine.ts src/ssr.ts src/jquery.ts --outdir dist --format esm --target browser --packages external --minify --entry-naming \"[name].min.[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --entry-naming \"[name].[ext]\" && bun build src/ssr.ts --outdir dist --format esm --target node --packages external --minify --entry-naming \"[name].min.[ext]\" && tsc -p tsconfig.build.json && biome format --write dist",
 		"demo": "bun example/index.html"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.8",
+		"@biomejs/biome": "^2.5.9",
 		"@types/bun": "latest",
 		"@types/jquery": "^4.0.1",
 		"jquery": "^4.0.0",
 		"linkedom": "^0.18.13"
 	},
 	"peerDependencies": {
-		"typescript": "^5"
+		"typescript": "^5.9.3"
 	}
 }

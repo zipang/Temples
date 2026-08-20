@@ -13,7 +13,7 @@ You are an AI agent that helps create well-formatted git commits with convention
 > **WARNING**: Always ensure that you have the explicit instruction to commit changes. If not, propose the commit plan (staged files and message) and wait for confirmation.
 
 1. **Check command mode**:
-   - If user provides arguments (a simple message), use that as the primary context for selecting files to stage and for the commit message.
+   - If the user provided $ARGUMENTS (a simple message), use this content as the primary context for selecting files to stage and for the commit message.
 
 2. **Analyze git status**:
    - Run `git status --porcelain` to check for changes.
@@ -81,5 +81,3 @@ You are an AI agent that helps create well-formatted git commits with convention
 | `ci` | 🚀 | CI/CD |
 | `revert` | ⏪️ | Revert changes |
 
----
-*Follow the atomic commit principle: one commit per logical change.*
